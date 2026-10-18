@@ -18,6 +18,22 @@ export function shouldShowTabLabels(
   return scrollY <= threshold;
 }
 
+export function computeFloatingTabBarMetrics(windowWidth: number) {
+  const isWideScreen = windowWidth >= 768;
+  const horizontalMargin = isWideScreen ? 32 : 24;
+  const maxBarWidth = isWideScreen ? 460 : 352;
+  const barWidth = Math.max(280, Math.min(windowWidth - horizontalMargin * 2, maxBarWidth));
+  const barHorizontalOffset = Math.max(horizontalMargin, (windowWidth - barWidth) / 2);
+  const tabSlotWidth = (barWidth - 8) / 5;
+
+  return {
+    isWideScreen,
+    barWidth,
+    barHorizontalOffset,
+    tabSlotWidth,
+  };
+}
+
 export type TabScrollEvent =
   NativeSyntheticEvent<NativeScrollEvent> | { nativeEvent: { contentOffset: { y: number } } };
 

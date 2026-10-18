@@ -1,5 +1,5 @@
 import { uiLogger } from '@/services/logger';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Platform,
   Alert,
   useWindowDimensions,
+  Animated,
+  Easing,
   ViewStyle,
 } from 'react-native';
 import { Calendar, User, CreditCard, Trash2, X, Pencil, Tag } from 'lucide-react-native';
@@ -49,6 +51,19 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   const members = useAppStore((s) => s.members);
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+  const [sheetTranslateY] = useState(() => new Animated.Value(20));
+
+  useEffect(() => {
+    if (visible) {
+      sheetTranslateY.setValue(20);
+      Animated.timing(sheetTranslateY, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    }
+  }, [visible, sheetTranslateY]);
 
   if (!expense) return null;
 
@@ -98,7 +113,13 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
       <View
         style={{
           flex: 1,
@@ -108,7 +129,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
           padding: isDesktop ? spacing.lg : 0,
         }}
       >
-        <View
+        <Animated.View
           style={[
             {
               backgroundColor: theme.colors.surface,
@@ -126,6 +147,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               borderWidth: 1,
               borderColor: theme.colors.cardBorder,
               borderBottomWidth: isDesktop ? 1 : 0,
+              transform: [{ translateY: sheetTranslateY }],
             },
             Platform.OS === 'web' &&
               ({
@@ -551,7 +573,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               />
             </View>
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

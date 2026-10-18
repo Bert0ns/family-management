@@ -341,7 +341,7 @@ export const AiPromptCard: React.FC<AiPromptCardProps> = ({
       {/* Prompt Preview Modal */}
       <Modal
         visible={modalVisible}
-        animationType="slide"
+        animationType="fade"
         presentationStyle="pageSheet"
         onRequestClose={() => setModalVisible(false)}
       >

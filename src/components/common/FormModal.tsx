@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Platform,
   ScrollView,
   useWindowDimensions,
+  Animated,
+  Easing,
   ViewStyle,
 } from 'react-native';
 import { X, Check } from 'lucide-react-native';
@@ -38,6 +40,19 @@ export const FormModal: React.FC<FormModalProps> = ({
   const { theme, spacing, radius, typography } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+  const [sheetTranslateY] = useState(() => new Animated.Value(20));
+
+  useEffect(() => {
+    if (visible) {
+      sheetTranslateY.setValue(20);
+      Animated.timing(sheetTranslateY, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    }
+  }, [visible, sheetTranslateY]);
 
   const isWeb = Platform.OS === 'web';
   const webModalStyle: ViewStyle = isWeb
@@ -53,7 +68,13 @@ export const FormModal: React.FC<FormModalProps> = ({
     : {};
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{
@@ -64,7 +85,7 @@ export const FormModal: React.FC<FormModalProps> = ({
           padding: isDesktop ? spacing.lg : 0,
         }}
       >
-        <View
+        <Animated.View
           style={[
             {
               backgroundColor: theme.colors.surface,
@@ -82,6 +103,7 @@ export const FormModal: React.FC<FormModalProps> = ({
               borderWidth: 1,
               borderColor: theme.colors.cardBorder,
               borderBottomWidth: isDesktop ? 1 : 0,
+              transform: [{ translateY: sheetTranslateY }],
             },
             webModalStyle,
           ]}
@@ -167,7 +189,7 @@ export const FormModal: React.FC<FormModalProps> = ({
               style={{ flex: 1 }}
             />
           </View>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );

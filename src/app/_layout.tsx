@@ -39,6 +39,7 @@ function RootLayoutNav() {
           name="expense/add"
           options={{
             presentation: 'modal',
+            animation: 'fade',
             title: t.addExpense.title,
             headerShown: true,
             headerLeft: () => (

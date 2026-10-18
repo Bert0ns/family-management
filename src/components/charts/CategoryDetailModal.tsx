@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   ScrollView,
   Platform,
   useWindowDimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import { X, Tag } from 'lucide-react-native';
 import { useTheme } from '@/theme';
@@ -36,6 +38,19 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
   const { t } = useI18n();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+  const [sheetTranslateY] = useState(() => new Animated.Value(20));
+
+  useEffect(() => {
+    if (visible) {
+      sheetTranslateY.setValue(20);
+      Animated.timing(sheetTranslateY, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    }
+  }, [visible, sheetTranslateY]);
 
   if (!categorySummary) return null;
 
@@ -52,7 +67,13 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
   const getMember = (memberId: string) => members.find((m) => m.id === memberId);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
       <View
         style={{
           flex: 1,
@@ -62,7 +83,7 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
           padding: isDesktop ? spacing.lg : 0,
         }}
       >
-        <View
+        <Animated.View
           style={[
             {
               backgroundColor: theme.colors.surface,
@@ -79,6 +100,7 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
               maxWidth: isDesktop ? 540 : undefined,
               borderWidth: 1,
               borderColor: theme.colors.cardBorder,
+              transform: [{ translateY: sheetTranslateY }],
             },
             Platform.OS === 'web' &&
               ({
@@ -355,7 +377,7 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
           <View style={{ marginTop: spacing.md }}>
             <Button title={t.analytics.closeDetails} variant="outline" onPress={onClose} />
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
