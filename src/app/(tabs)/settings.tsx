@@ -37,6 +37,7 @@ import { FamilyPairingModal } from '@/components/sync/FamilyPairingModal';
 import { useTabScroll } from '@/context/TabScrollContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SyncBadge } from '@/components/common/SyncBadge';
+import { isValidUUID } from '@/utils/uuid';
 
 export default function SettingsScreen() {
   const {
@@ -85,11 +86,8 @@ export default function SettingsScreen() {
     const sub = authService.onAuthStateChange((_session, user) => {
       if (isMounted) {
         setUserEmail(user?.email || null);
-        if (user) {
-          setShowAuthModal(false);
-          if (Platform.OS !== 'web' && pushEnabled) {
-            pushNotificationService.registerForPushNotificationsAsync(user.id);
-          }
+        if (user && Platform.OS !== 'web' && pushEnabled) {
+          pushNotificationService.registerForPushNotificationsAsync(user.id);
         }
       }
     });
@@ -101,10 +99,9 @@ export default function SettingsScreen() {
   }, [pushEnabled]);
 
   const handleManualSync = async () => {
+    if (!family?.id || !isValidUUID(family.id)) return;
     await syncEngine.flushOutbox();
-    if (family?.id) {
-      await syncEngine.fetchDelta(family.id);
-    }
+    await syncEngine.fetchDelta(family.id);
   };
 
   const executeSignOut = async (wipeLocalData: boolean = false) => {

@@ -3,7 +3,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { supabaseLogger, syncLogger, transactionLogger } from './logger';
 import { useAppStore, registerStoreMutationListener } from './store';
 import { OutboxMutation, SyncStatus, Expense, Category, FamilyMember, ImportBatch } from '@/types';
-import { generateUUID } from '@/utils/uuid';
+import { generateUUID, isValidUUID } from '@/utils/uuid';
 
 export const OUTBOX_STORAGE_KEY = '@bert0ns_sync_outbox';
 export const LAST_SYNC_STORAGE_KEY = '@bert0ns_last_sync_timestamp';
@@ -519,7 +519,12 @@ export const syncEngine = {
     switch (entity) {
       case 'expense': {
         if (operation === 'INSERT' || operation === 'UPDATE') {
-          const { previous_category_id: _prevCatId, ...sanitizedPayload } = payload;
+          const {
+            previous_category_id: _prevCatId,
+            version: _version,
+            splits: _splits,
+            ...sanitizedPayload
+          } = payload;
           const query = supabase.from('expenses').upsert({
             ...sanitizedPayload,
             updated_at: sanitizedPayload.updated_at || new Date().toISOString(),
@@ -548,9 +553,10 @@ export const syncEngine = {
 
       case 'category': {
         if (operation === 'INSERT' || operation === 'UPDATE') {
+          const { version: _version, ...sanitizedCategory } = payload;
           const query = supabase.from('categories').upsert({
-            ...payload,
-            updated_at: payload.updated_at || new Date().toISOString(),
+            ...sanitizedCategory,
+            updated_at: sanitizedCategory.updated_at || new Date().toISOString(),
           });
           const result = await executeWithServerTimestamp<Category>(query);
           if (result.error) throw result.error;
@@ -576,7 +582,7 @@ export const syncEngine = {
 
       case 'member': {
         if (operation === 'INSERT' || operation === 'UPDATE') {
-          const { is_current_user, ...memberData } = payload;
+          const { is_current_user: _isCurrentUser, version: _version, ...memberData } = payload;
           const query = supabase.from('family_members').upsert({
             ...memberData,
             updated_at: memberData.updated_at || new Date().toISOString(),
@@ -818,7 +824,7 @@ export const syncEngine = {
         count += mappedBatches.length;
       }
 
-      // 5. Fetch notification preferences for current member
+      // 5. Fetch notification preferences for current member (update store directly without re-enqueuing outbox mutation)
       try {
         const currentMemberId = useAppStore.getState().currentMemberId;
         if (currentMemberId) {
@@ -829,13 +835,16 @@ export const syncEngine = {
             .maybeSingle();
 
           if (prefData) {
-            useAppStore.getState().updateNotificationPreferences({
-              push_enabled: prefData.push_enabled,
-              notify_batch_import: prefData.notify_batch_import,
-              notify_expense_updates: prefData.notify_expense_updates,
-              notify_member_joined: prefData.notify_member_joined,
-              notify_role_changed: prefData.notify_role_changed,
-            });
+            useAppStore.setState((state) => ({
+              notificationPreferences: {
+                ...state.notificationPreferences,
+                push_enabled: prefData.push_enabled,
+                notify_batch_import: prefData.notify_batch_import,
+                notify_expense_updates: prefData.notify_expense_updates,
+                notify_member_joined: prefData.notify_member_joined,
+                notify_role_changed: prefData.notify_role_changed,
+              },
+            }));
           }
         }
       } catch (prefErr) {
@@ -892,8 +901,13 @@ export const syncEngine = {
   },
 };
 
-// Auto-register mutation listener to queue mutations to outbox
+// Auto-register mutation listener to queue mutations to outbox only when connected to a valid cloud family UUID
 registerStoreMutationListener((event) => {
+  const activeFamilyId = useAppStore.getState().family.id;
+  if (!isValidUUID(activeFamilyId)) {
+    return;
+  }
+
   syncEngine
     .enqueueMutation({
       entity: event.entity,

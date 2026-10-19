@@ -5,6 +5,30 @@ import { syncEngine } from './syncEngine';
 import { generateUUID, isValidUUID, generateInviteCode } from '@/utils/uuid';
 import { Expense, Category, FamilyMember, ImportBatch } from '@/types';
 
+interface TableMutationBuilder {
+  upsert: (values: unknown) => Promise<{ error: { message?: string; code?: string } | null }>;
+  insert?: (values: unknown) => Promise<{ error: { message?: string; code?: string } | null }>;
+}
+
+function isRlsError(error: { message?: string; code?: string } | null | undefined): boolean {
+  if (!error) return false;
+  if (error.code === '42501') return true;
+  const msg = (error.message || '').toLowerCase();
+  return msg.includes('row-level security') || msg.includes('violates row-level security policy');
+}
+
+async function upsertWithInsertFallback(
+  tableName: string,
+  values: unknown,
+): Promise<{ error: { message?: string; code?: string } | null }> {
+  const table = supabase.from(tableName) as unknown as TableMutationBuilder;
+  const res = await table.upsert(values);
+  if (res.error && isRlsError(res.error) && typeof table.insert === 'function') {
+    return await table.insert(values);
+  }
+  return res;
+}
+
 export const migrationService = {
   async migrateLocalDataToSupabase(
     familyId: string,
@@ -55,11 +79,12 @@ export const migrationService = {
       const now = new Date().toISOString();
 
       // 2. Prepare and upsert Family record
-      targetFamilyId = isValidUUID(familyId) ? familyId : toUUID(familyId);
+      targetFamilyId = isValidUUID(familyId) ? familyId : toUUID(familyId || 'fam_default');
       const targetInviteCode = localFamily.invite_code || generateInviteCode(6);
-      const { error: famError } = await supabase.from('families').upsert({
+      const targetFamilyName = localFamily.name?.trim() || 'My Household';
+      const { error: famError } = await upsertWithInsertFallback('families', {
         id: targetFamilyId,
-        name: localFamily.name,
+        name: targetFamilyName,
         currency: localFamily.currency || '€',
         invite_code: targetInviteCode,
         updated_at: now,
@@ -68,24 +93,46 @@ export const migrationService = {
       createdFamily = true;
 
       // 3. Prepare and upsert Members FIRST so that is_member_of_family(targetFamilyId) passes for categories & expenses
-      const mappedMembers: FamilyMember[] = localMembers.map((m) => {
-        const isCurrent = m.id === store.currentMemberId;
+      const hasMatchingCurrentMember = localMembers.some((m) => m.id === store.currentMemberId);
+      const mappedMembers: FamilyMember[] = localMembers.map((m, index) => {
+        const isCurrent = hasMatchingCurrentMember ? m.id === store.currentMemberId : index === 0;
         return {
           ...m,
           id: toUUID(m.id),
           family_id: targetFamilyId!,
           user_id: isCurrent && userId ? userId : m.user_id,
+          role: isCurrent && userId ? 'ADMIN' : m.role,
+          is_current_user: isCurrent,
           updated_at: now,
         };
       });
 
-      // Upsert current user member first so that RLS is_member_of_family is satisfied
-      const currentUserMember = mappedMembers.find((m) => m.user_id === userId);
+      if (mappedMembers.length === 0 && userId) {
+        const fallbackMemberId =
+          store.currentMemberId && isValidUUID(store.currentMemberId)
+            ? store.currentMemberId
+            : generateUUID();
+        mappedMembers.push({
+          id: fallbackMemberId,
+          family_id: targetFamilyId!,
+          user_id: userId,
+          display_name: 'Admin',
+          role: 'ADMIN',
+          color_code: '#6366F1',
+          is_current_user: true,
+          created_at: now,
+          updated_at: now,
+        });
+      }
+
+      // Upsert current user member first so that RLS is_member_of_family and is_admin_of_family are satisfied
+      const currentUserMember =
+        (userId ? mappedMembers.find((m) => m.user_id === userId) : undefined) || mappedMembers[0];
       if (currentUserMember) {
-        const { error: currMemErr } = await supabase.from('family_members').upsert({
+        const { error: currMemErr } = await upsertWithInsertFallback('family_members', {
           id: currentUserMember.id,
           family_id: currentUserMember.family_id,
-          user_id: currentUserMember.user_id,
+          user_id: currentUserMember.user_id || null,
           display_name: currentUserMember.display_name,
           role: currentUserMember.role,
           avatar_url: currentUserMember.avatar_url || null,
@@ -98,7 +145,8 @@ export const migrationService = {
       // Upsert remaining members
       const remainingMembers = mappedMembers.filter((m) => m.id !== currentUserMember?.id);
       if (remainingMembers.length > 0) {
-        const { error: remMemErr } = await supabase.from('family_members').upsert(
+        const { error: remMemErr } = await upsertWithInsertFallback(
+          'family_members',
           remainingMembers.map((m) => ({
             id: m.id,
             family_id: m.family_id,
@@ -121,18 +169,20 @@ export const migrationService = {
         updated_at: now,
       }));
 
-      const { error: catError } = await supabase.from('categories').upsert(
-        mappedCategories.map((c) => ({
-          id: c.id,
-          family_id: c.family_id,
-          name: c.name,
-          icon: c.icon,
-          color: c.color,
-          is_default: Boolean(c.is_default),
-          updated_at: now,
-        })),
-      );
-      if (catError) throw catError;
+      if (mappedCategories.length > 0) {
+        const { error: catError } = await supabase.from('categories').upsert(
+          mappedCategories.map((c) => ({
+            id: c.id,
+            family_id: c.family_id,
+            name: c.name,
+            icon: c.icon,
+            color: c.color,
+            is_default: Boolean(c.is_default),
+            updated_at: now,
+          })),
+        );
+        if (catError) throw catError;
+      }
 
       // 5. Prepare and upsert Import Batches BEFORE expenses to satisfy foreign key constraints
       const mappedBatches: ImportBatch[] = localBatches.map((b) => ({
@@ -195,11 +245,14 @@ export const migrationService = {
       }
 
       // 7. Update local store state with the mapped UUID entities
-      const newCurrentMemberId = toUUID(store.currentMemberId);
+      const newCurrentMemberId =
+        currentUserMember?.id ||
+        (store.currentMemberId ? toUUID(store.currentMemberId) : mappedMembers[0]?.id || '');
       useAppStore.setState({
         family: {
           ...localFamily,
           id: targetFamilyId,
+          name: targetFamilyName,
           invite_code: targetInviteCode,
           updated_at: now,
         },

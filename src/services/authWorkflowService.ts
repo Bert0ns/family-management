@@ -113,7 +113,21 @@ export const authWorkflowService = {
     // 3. Post-authentication resolver: check if user already belongs to a family in Supabase
     const existingMembership = await this.checkExistingFamilyMembership(userId);
 
-    // Scenario A: Family membership already exists (multi-device login / 2nd device)
+    // Scenario A: User explicitly logged in with intent to join an existing household via invite code
+    if (intent === 'join') {
+      authLogger.info(
+        'User intent is to join via invite code; skipping migration and awaiting invite code',
+        { userId, hasExistingMembership: Boolean(existingMembership) },
+      );
+      await syncEngine.clearOutbox();
+      return {
+        success: true,
+        user,
+        actionTaken: 'ready_to_join',
+      };
+    }
+
+    // Scenario B: Family membership already exists (multi-device login / 2nd device)
     if (existingMembership) {
       const existingFamilyId = existingMembership.family_id;
       const memberId = existingMembership.id;
@@ -172,19 +186,6 @@ export const authWorkflowService = {
           error: message || 'Failed to sync existing cloud data',
         };
       }
-    }
-
-    // Scenario B: No family membership exists and user logged in with intent to join via invite code
-    if (intent === 'join') {
-      authLogger.info(
-        'No family membership found and user intent is to join via invite code; skipping migration',
-        { userId },
-      );
-      return {
-        success: true,
-        user,
-        actionTaken: 'ready_to_join',
-      };
     }
 
     // Scenario C: No family membership exists and user is creating/syncing their first cloud family
