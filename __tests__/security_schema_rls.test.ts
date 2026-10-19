@@ -10,15 +10,21 @@ describe('Database Security & RLS Policy Hardening', () => {
   const schemaPath = path.resolve(__dirname, '../src/data/supabase_schema.sql');
   const schemaSql: string = fs.readFileSync(schemaPath, 'utf8');
 
-  it('declares is_admin_of_family helper function with SECURITY DEFINER and search_path set', () => {
+  it('declares is_admin_of_family helper function with SECURITY DEFINER, search_path, and deleted_at check', () => {
     expect(schemaSql).toMatch(
       /CREATE OR REPLACE FUNCTION public\.is_admin_of_family\(f_id UUID\)[\s\S]*?SECURITY DEFINER SET search_path = public, pg_temp;/,
     );
+    expect(schemaSql).toMatch(
+      /CREATE OR REPLACE FUNCTION public\.is_admin_of_family\(f_id UUID\)[\s\S]*?AND role = 'ADMIN'[\s\S]*?AND deleted_at IS NULL/,
+    );
   });
 
-  it('declares is_member_of_family helper function with SECURITY DEFINER and search_path set', () => {
+  it('declares is_member_of_family helper function with SECURITY DEFINER, search_path, and deleted_at check', () => {
     expect(schemaSql).toMatch(
       /CREATE OR REPLACE FUNCTION public\.is_member_of_family\(f_id UUID\)[\s\S]*?SECURITY DEFINER SET search_path = public, pg_temp;/,
+    );
+    expect(schemaSql).toMatch(
+      /CREATE OR REPLACE FUNCTION public\.is_member_of_family\(f_id UUID\)[\s\S]*?WHERE family_id = f_id AND user_id = auth\.uid\(\) AND deleted_at IS NULL/,
     );
   });
 
@@ -48,6 +54,45 @@ describe('Database Security & RLS Policy Hardening', () => {
     expect(schemaSql).toMatch(
       /CREATE POLICY "import_batches_family_access" ON public\.import_batches[\s\S]*?family_id IN \(SELECT family_id FROM public\.family_members WHERE user_id = auth\.uid\(\)\)/,
     );
+  });
+
+  it('enforces DELETE RLS policy on public.families restricted to family admins', () => {
+    expect(schemaSql).toContain('CREATE POLICY "Admins can delete families"');
+    expect(schemaSql).toMatch(
+      /CREATE POLICY "Admins can delete families"\s+ON public\.families FOR DELETE\s+USING \(public\.is_admin_of_family\(id\)\);/,
+    );
+  });
+
+  it('excludes soft-deleted members and uses session actor in handle_expense_change_notification', () => {
+    expect(schemaSql).toMatch(
+      /CREATE OR REPLACE FUNCTION public\.handle_expense_change_notification\(\)[\s\S]*?AND fm\.deleted_at IS NULL/,
+    );
+    expect(schemaSql).toMatch(
+      /SELECT id INTO actor_id\s+FROM public\.family_members\s+WHERE family_id = fam_id AND user_id = auth\.uid\(\) AND deleted_at IS NULL/,
+    );
+  });
+
+  it('excludes soft-deleted members in import batch and member lifecycle notifications', () => {
+    expect(schemaSql).toMatch(
+      /CREATE OR REPLACE FUNCTION public\.handle_import_batch_notification\(\)[\s\S]*?AND fm\.deleted_at IS NULL/,
+    );
+    expect(schemaSql).toMatch(
+      /CREATE OR REPLACE FUNCTION public\.handle_member_lifecycle_notification\(\)[\s\S]*?AND fm\.deleted_at IS NULL/,
+    );
+  });
+
+  it('protects join_family_via_invite_code against brute-force and unauthenticated calls', () => {
+    expect(schemaSql).toMatch(/CREATE TABLE IF NOT EXISTS public\.invite_code_attempts/);
+    expect(schemaSql).toContain(
+      'ALTER TABLE public.invite_code_attempts ENABLE ROW LEVEL SECURITY;',
+    );
+    expect(schemaSql).toMatch(
+      /CREATE OR REPLACE FUNCTION public\.join_family_via_invite_code[\s\S]*?IF auth\.uid\(\) IS NULL THEN[\s\S]*?Authentication required/,
+    );
+    expect(schemaSql).toMatch(
+      /SELECT COUNT\(\*\) INTO v_failed_attempts[\s\S]*?FROM public\.invite_code_attempts[\s\S]*?INTERVAL '15 minutes'/,
+    );
+    expect(schemaSql).toMatch(/v_failed_attempts >= 5[\s\S]*?rate_limited/);
   });
 });
 

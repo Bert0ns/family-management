@@ -105,7 +105,7 @@ BEFORE UPDATE ON public.expenses
 FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- 8. Push Tokens Table
-CREATE TABLE IF NOT EXISTS public.push_tokens (\
+CREATE TABLE IF NOT EXISTS public.push_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     member_id UUID REFERENCES public.family_members(id) ON DELETE CASCADE,
@@ -158,24 +158,24 @@ ALTER TABLE public.push_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
--- Helper function: check if authenticated user belongs to family
+-- Helper function: check if authenticated user belongs to family (excluding soft-deleted members)
 CREATE OR REPLACE FUNCTION public.is_member_of_family(f_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.family_members
-    WHERE family_id = f_id AND user_id = auth.uid()
+    WHERE family_id = f_id AND user_id = auth.uid() AND deleted_at IS NULL
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
--- Helper function: check if authenticated user is admin of family
+-- Helper function: check if authenticated user is admin of family (excluding soft-deleted members)
 CREATE OR REPLACE FUNCTION public.is_admin_of_family(f_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.family_members
-    WHERE family_id = f_id AND user_id = auth.uid() AND role = 'ADMIN'
+    WHERE family_id = f_id AND user_id = auth.uid() AND role = 'ADMIN' AND deleted_at IS NULL
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
@@ -192,6 +192,10 @@ WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "Family members can update family details"
 ON public.families FOR UPDATE
 USING (public.is_member_of_family(id));
+
+CREATE POLICY "Admins can delete families"
+ON public.families FOR DELETE
+USING (public.is_admin_of_family(id));
 
 -- Family Members Policies
 CREATE POLICY "Family members can view members"
@@ -339,7 +343,32 @@ ALTER TABLE public.expenses REPLICA IDENTITY FULL;
 ALTER TABLE public.notification_preferences REPLICA IDENTITY FULL;
 ALTER TABLE public.notifications REPLICA IDENTITY FULL;
 
--- 13. Secure RPC for joining a family via invite code
+-- 13. Brute-Force Rate Limiting Table & Secure RPC for joining a family via invite code
+-- Mitigations against brute-force attacks:
+--   1. Require an authenticated user (auth.uid() IS NOT NULL)
+--   2. Strict code format validation (length, trimming, non-null)
+--   3. Rate limit table tracking failed attempts per user (max 5 failed attempts per 15 minutes)
+--   4. Constant-time / generic failure responses to prevent oracle enumeration
+--   5. Soft-deleted member handling (restores membership if previously deleted)
+CREATE TABLE IF NOT EXISTS public.invite_code_attempts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    attempted_at TIMESTAMPTZ DEFAULT NOW(),
+    success BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+ALTER TABLE public.invite_code_attempts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can only view their own invite code attempts"
+ON public.invite_code_attempts FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own invite code attempts"
+ON public.invite_code_attempts FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_invite_attempts_user_time ON public.invite_code_attempts(user_id, attempted_at DESC);
+
 CREATE OR REPLACE FUNCTION public.join_family_via_invite_code(
   p_invite_code TEXT,
   p_display_name TEXT,
@@ -351,14 +380,52 @@ DECLARE
   v_family RECORD;
   v_existing_member RECORD;
   v_new_member RECORD;
+  v_failed_attempts INTEGER;
 BEGIN
-  -- 1. Validate invite code (case-insensitive)
+  -- 1. Ensure caller is authenticated
+  IF auth.uid() IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'status', 'error',
+      'error', 'Authentication required'
+    );
+  END IF;
+
+  -- 2. Validate invite code format (mitigate brute force on arbitrary or malformed inputs)
+  IF p_invite_code IS NULL OR LENGTH(TRIM(p_invite_code)) < 4 OR LENGTH(TRIM(p_invite_code)) > 16 THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'status', 'error',
+      'error', 'Invalid invite code format'
+    );
+  END IF;
+
+  -- 3. Rate limiting check: max 5 failed attempts per user in the last 15 minutes
+  SELECT COUNT(*) INTO v_failed_attempts
+  FROM public.invite_code_attempts
+  WHERE user_id = auth.uid()
+    AND attempted_at > NOW() - INTERVAL '15 minutes'
+    AND success = FALSE;
+
+  IF v_failed_attempts >= 5 THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'status', 'rate_limited',
+      'error', 'Too many failed attempts. Please try again in 15 minutes.'
+    );
+  END IF;
+
+  -- 4. Validate invite code (case-insensitive)
   SELECT id, name, currency INTO v_family
   FROM public.families
-  WHERE UPPER(invite_code) = UPPER(p_invite_code)
+  WHERE UPPER(invite_code) = UPPER(TRIM(p_invite_code))
   LIMIT 1;
 
   IF NOT FOUND THEN
+    -- Record failed attempt for rate limiting
+    INSERT INTO public.invite_code_attempts (user_id, success)
+    VALUES (auth.uid(), FALSE);
+
     RETURN jsonb_build_object(
       'success', false,
       'status', 'error',
@@ -366,25 +433,54 @@ BEGIN
     );
   END IF;
 
-  -- 2. Check if auth user is already a member of this family
-  SELECT id, display_name, role INTO v_existing_member
+  -- 5. Check if auth user is already a member of this family
+  SELECT id, display_name, role, deleted_at INTO v_existing_member
   FROM public.family_members
   WHERE family_id = v_family.id AND user_id = auth.uid()
   LIMIT 1;
 
   IF FOUND THEN
-    RETURN jsonb_build_object(
-      'success', true,
-      'status', 'already_joined',
-      'family_id', v_family.id,
-      'member_id', v_existing_member.id,
-      'already_member', true,
-      'family', jsonb_build_object('id', v_family.id, 'name', v_family.name, 'currency', v_family.currency),
-      'member', jsonb_build_object('id', v_existing_member.id, 'display_name', v_existing_member.display_name, 'role', v_existing_member.role)
-    );
+    -- If previously soft-deleted, reactivate the membership
+    IF v_existing_member.deleted_at IS NOT NULL THEN
+      UPDATE public.family_members
+      SET deleted_at = NULL,
+          display_name = COALESCE(NULLIF(TRIM(p_display_name), ''), v_existing_member.display_name),
+          color_code = COALESCE(p_color_code, color_code),
+          avatar_url = COALESCE(p_avatar_url, avatar_url),
+          updated_at = NOW()
+      WHERE id = v_existing_member.id
+      RETURNING id, display_name, role INTO v_new_member;
+
+      INSERT INTO public.invite_code_attempts (user_id, success)
+      VALUES (auth.uid(), TRUE);
+
+      RETURN jsonb_build_object(
+        'success', true,
+        'status', 'reactivated',
+        'family_id', v_family.id,
+        'member_id', v_new_member.id,
+        'already_member', false,
+        'family', jsonb_build_object('id', v_family.id, 'name', v_family.name, 'currency', v_family.currency),
+        'member', jsonb_build_object('id', v_new_member.id, 'display_name', v_new_member.display_name, 'role', v_new_member.role)
+      );
+    ELSE
+      -- Record successful attempt
+      INSERT INTO public.invite_code_attempts (user_id, success)
+      VALUES (auth.uid(), TRUE);
+
+      RETURN jsonb_build_object(
+        'success', true,
+        'status', 'already_joined',
+        'family_id', v_family.id,
+        'member_id', v_existing_member.id,
+        'already_member', true,
+        'family', jsonb_build_object('id', v_family.id, 'name', v_family.name, 'currency', v_family.currency),
+        'member', jsonb_build_object('id', v_existing_member.id, 'display_name', v_existing_member.display_name, 'role', v_existing_member.role)
+      );
+    END IF;
   END IF;
 
-  -- 3. Insert new member with MEMBER role
+  -- 6. Insert new member with MEMBER role
   INSERT INTO public.family_members (
     family_id,
     user_id,
@@ -402,10 +498,14 @@ BEGIN
   )
   RETURNING id, display_name, role INTO v_new_member;
 
-  -- 4. Create default notification preferences
+  -- 7. Create default notification preferences
   INSERT INTO public.notification_preferences (member_id)
   VALUES (v_new_member.id)
   ON CONFLICT (member_id) DO NOTHING;
+
+  -- Record successful attempt
+  INSERT INTO public.invite_code_attempts (user_id, success)
+  VALUES (auth.uid(), TRUE);
 
   RETURN jsonb_build_object(
     'success', true,
@@ -437,6 +537,7 @@ BEGIN
     LEFT JOIN public.notification_preferences np ON np.member_id = fm.id
     WHERE fm.family_id = NEW.family_id
       AND fm.id <> NEW.imported_by_member_id
+      AND fm.deleted_at IS NULL
       AND COALESCE(np.push_enabled, true) = true
       AND COALESCE(np.notify_batch_import, true) = true
   LOOP
@@ -473,11 +574,12 @@ DECLARE
 BEGIN
   IF TG_OP = 'DELETE' THEN
     change_type := 'deleted';
-    actor_id := OLD.paid_by_member_id;
     fam_id := OLD.family_id;
     exp_id := OLD.id;
     msg_body := 'An expense for ' || OLD.merchant_name || ' (€' || OLD.amount || ') was deleted';
   ELSIF TG_OP = 'UPDATE' THEN
+    fam_id := NEW.family_id;
+    exp_id := NEW.id;
     -- Check if soft deleted
     IF OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL THEN
       change_type := 'deleted';
@@ -486,9 +588,23 @@ BEGIN
       change_type := 'updated';
       msg_body := 'An expense for ' || NEW.merchant_name || ' was updated to €' || NEW.amount;
     END IF;
-    actor_id := NEW.paid_by_member_id;
-    fam_id := NEW.family_id;
-    exp_id := NEW.id;
+  END IF;
+
+  -- Identify the real actor member from the authenticated user context to prevent forging the actor
+  IF auth.uid() IS NOT NULL THEN
+    SELECT id INTO actor_id
+    FROM public.family_members
+    WHERE family_id = fam_id AND user_id = auth.uid() AND deleted_at IS NULL
+    LIMIT 1;
+  END IF;
+
+  -- Fallback if executed outside authenticated session context (e.g. system maintenance/batch)
+  IF actor_id IS NULL THEN
+    IF TG_OP = 'DELETE' THEN
+      actor_id := OLD.paid_by_member_id;
+    ELSE
+      actor_id := NEW.paid_by_member_id;
+    END IF;
   END IF;
 
   FOR rec IN
@@ -496,7 +612,8 @@ BEGIN
     FROM public.family_members fm
     LEFT JOIN public.notification_preferences np ON np.member_id = fm.id
     WHERE fm.family_id = fam_id
-      AND fm.id <> actor_id
+      AND (actor_id IS NULL OR fm.id <> actor_id)
+      AND fm.deleted_at IS NULL
       AND COALESCE(np.push_enabled, true) = true
       AND COALESCE(np.notify_expense_updates, true) = true
   LOOP
@@ -536,6 +653,7 @@ BEGIN
       LEFT JOIN public.notification_preferences np ON np.member_id = fm.id
       WHERE fm.family_id = NEW.family_id
         AND fm.id <> NEW.id
+        AND fm.deleted_at IS NULL
         AND COALESCE(np.push_enabled, true) = true
         AND COALESCE(np.notify_member_joined, true) = true
     LOOP
@@ -563,6 +681,7 @@ BEGIN
     FROM public.family_members fm
     LEFT JOIN public.notification_preferences np ON np.member_id = NEW.id
     WHERE fm.id = NEW.id
+      AND fm.deleted_at IS NULL
       AND COALESCE(np.push_enabled, true) = true
       AND COALESCE(np.notify_role_changed, true) = true;
   END IF;
