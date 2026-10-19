@@ -6,7 +6,6 @@ import { useI18n } from '@/i18n';
 import { syncEngine } from '@/services/syncEngine';
 import { useAppStore } from '@/services/store';
 import { SyncStatus } from '@/types';
-import { isValidUUID } from '@/utils/uuid';
 
 interface SyncBadgeProps {
   onPress?: () => void;
@@ -33,11 +32,10 @@ export const SyncBadge: React.FC<SyncBadgeProps> = ({ onPress, showLabel = true 
       return;
     }
 
-    if (isManualSyncing || !family?.id || !isValidUUID(family.id)) return;
+    if (isManualSyncing) return;
     setIsManualSyncing(true);
     try {
-      await syncEngine.flushOutbox();
-      await syncEngine.fetchDelta(family.id);
+      await syncEngine.triggerManualSync(family?.id);
     } finally {
       setIsManualSyncing(false);
     }

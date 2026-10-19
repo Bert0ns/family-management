@@ -37,7 +37,6 @@ import { FamilyPairingModal } from '@/components/sync/FamilyPairingModal';
 import { useTabScroll } from '@/context/TabScrollContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SyncBadge } from '@/components/common/SyncBadge';
-import { isValidUUID } from '@/utils/uuid';
 
 export default function SettingsScreen() {
   const {
@@ -99,9 +98,7 @@ export default function SettingsScreen() {
   }, [pushEnabled]);
 
   const handleManualSync = async () => {
-    if (!family?.id || !isValidUUID(family.id)) return;
-    await syncEngine.flushOutbox();
-    await syncEngine.fetchDelta(family.id);
+    await syncEngine.triggerManualSync(family?.id);
   };
 
   const executeSignOut = async (wipeLocalData: boolean = false) => {
