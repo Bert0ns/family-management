@@ -98,7 +98,7 @@ export const PasteJsonModal: React.FC<PasteJsonModalProps> = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >

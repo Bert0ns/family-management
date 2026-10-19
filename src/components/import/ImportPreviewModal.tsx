@@ -1,5 +1,15 @@
-import React, { useMemo } from 'react';
-import { View, Text, Modal, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  Modal,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+  useWindowDimensions,
+  Animated,
+  Easing,
+} from 'react-native';
 import { X, CheckCircle2, AlertTriangle } from 'lucide-react-native';
 import { useTheme } from '@/theme';
 import { useI18n, getLocalizedCategoryName } from '@/i18n';
@@ -25,6 +35,19 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = React.memo(
     const { width: windowWidth } = useWindowDimensions();
 
     const isDesktop = windowWidth >= 768;
+    const [sheetTranslateY] = useState(() => new Animated.Value(20));
+
+    useEffect(() => {
+      if (visible) {
+        sheetTranslateY.setValue(20);
+        Animated.timing(sheetTranslateY, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: Platform.OS !== 'web',
+        }).start();
+      }
+    }, [visible, sheetTranslateY]);
 
     const totalAmount = useMemo(
       () => (report ? sumBy(report.expenses, (e) => e.amount) : 0),
@@ -51,17 +74,23 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = React.memo(
     if (!report) return null;
 
     return (
-      <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <Modal
+        visible={visible}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+        onRequestClose={onClose}
+      >
         <View
           style={{
             flex: 1,
-            backgroundColor: theme.isDark ? 'rgba(0,0,0,0.65)' : 'rgba(15,23,42,0.35)',
+            backgroundColor: theme.colors.backdrop,
             justifyContent: isDesktop ? 'center' : 'flex-end',
             alignItems: isDesktop ? 'center' : 'stretch',
             padding: isDesktop ? spacing.lg : 0,
           }}
         >
-          <View
+          <Animated.View
             style={{
               backgroundColor: theme.colors.surface,
               borderRadius: isDesktop ? radius.sm : undefined,
@@ -75,6 +104,7 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = React.memo(
               maxWidth: isDesktop ? 540 : undefined,
               borderWidth: 1.5,
               borderColor: theme.colors.cardBorder,
+              transform: [{ translateY: sheetTranslateY }],
             }}
           >
             {/* Header */}
@@ -297,7 +327,7 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = React.memo(
                 />
               </View>
             </View>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     );

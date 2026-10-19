@@ -21,7 +21,11 @@ import { authService } from '@/services/authService';
 import { syncEngine } from '@/services/syncEngine';
 import { realtimeSync } from '@/services/realtimeSync';
 import { isValidUUID } from '@/utils/uuid';
-import { TabScrollProvider, useTabScroll } from '@/context/TabScrollContext';
+import {
+  TabScrollProvider,
+  useTabScroll,
+  computeFloatingTabBarMetrics,
+} from '@/context/TabScrollContext';
 
 function TabsLayoutContent() {
   const { theme } = useTheme();
@@ -31,12 +35,9 @@ function TabsLayoutContent() {
   const family = useAppStore((s) => s.family);
   const { labelsVisibility, resetTabScroll } = useTabScroll();
 
-  // Floating dock dimensions
-  const isWideScreen = windowWidth >= 768;
-  const barWidth = isWideScreen ? Math.min(windowWidth - 32, 560) : windowWidth - 16;
-  const barLeft = Math.max(8, (windowWidth - barWidth) / 2);
+  // Floating dock dimensions — compact centered pill across Android, iOS, and Web
+  const { barWidth, barHorizontalOffset, tabSlotWidth } = computeFloatingTabBarMetrics(windowWidth);
   const floatingBottom = Math.max(insets.bottom, 12) + (Platform.OS === 'ios' ? 4 : 8);
-  const tabSlotWidth = (barWidth - 8) / 5;
 
   // Global Sync & Auth Lifecycle Bootstrap
   useEffect(() => {
@@ -92,14 +93,14 @@ function TabsLayoutContent() {
           alignItems: 'center',
           justifyContent: 'center',
           width: '100%',
-          height: 60,
+          height: 56,
           paddingHorizontal: 1,
         }}
       >
         <View
           style={{
-            width: 42,
-            height: 34,
+            width: 40,
+            height: 32,
             borderRadius: Radius.dockInner,
             alignItems: 'center',
             justifyContent: 'center',
@@ -113,12 +114,13 @@ function TabsLayoutContent() {
           }}
         >
           <IconComponent
-            size={21}
+            size={20}
             color={focused ? theme.colors.brand : (color as string)}
             strokeWidth={focused ? 2.5 : 2}
           />
         </View>
         <Animated.Text
+          numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.8}
           style={{
@@ -185,9 +187,13 @@ function TabsLayoutContent() {
         tabBarStyle: {
           position: 'absolute',
           bottom: floatingBottom,
-          left: barLeft,
+          left: barHorizontalOffset,
+          right: barHorizontalOffset,
+          start: barHorizontalOffset,
+          end: barHorizontalOffset,
           width: barWidth,
-          height: 68,
+          alignSelf: 'center',
+          height: 64,
           backgroundColor: 'transparent',
           borderRadius: Radius.dock,
           borderWidth: 1,
@@ -231,7 +237,7 @@ function TabsLayoutContent() {
         ),
         tabBarIconStyle: {
           width: '100%',
-          height: 60,
+          height: 56,
           justifyContent: 'center',
           alignItems: 'center',
           margin: 0,
@@ -242,7 +248,7 @@ function TabsLayoutContent() {
           minWidth: 0,
           justifyContent: 'center',
           alignItems: 'center',
-          height: 68,
+          height: 64,
           padding: 0,
           margin: 0,
         },
