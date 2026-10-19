@@ -12,6 +12,10 @@ import { Animated, Easing, type NativeSyntheticEvent, type NativeScrollEvent } f
 export const SCROLL_THRESHOLD = 24;
 export const TAB_BAR_EXPANDED_HEIGHT = 64;
 export const TAB_BAR_COLLAPSED_HEIGHT = 48;
+export const TAB_BAR_EXPANDED_WIDTH = 352;
+export const TAB_BAR_COLLAPSED_WIDTH = 270;
+export const TAB_BAR_EXPANDED_WIDTH_WIDE = 460;
+export const TAB_BAR_COLLAPSED_WIDTH_WIDE = 350;
 export const TAB_BAR_ANIMATION_DURATION = 200;
 
 export function shouldShowTabLabels(
@@ -24,18 +28,64 @@ export function shouldShowTabLabels(
 export function computeFloatingTabBarMetrics(windowWidth: number) {
   const isWideScreen = windowWidth >= 768;
   const horizontalMargin = isWideScreen ? 32 : 24;
-  const maxBarWidth = isWideScreen ? 460 : 352;
-  const barWidth = Math.max(280, Math.min(windowWidth - horizontalMargin * 2, maxBarWidth));
-  const barHorizontalOffset = Math.max(horizontalMargin, (windowWidth - barWidth) / 2);
-  const tabSlotWidth = (barWidth - 8) / 5;
+
+  const maxExpandedWidth = isWideScreen ? TAB_BAR_EXPANDED_WIDTH_WIDE : TAB_BAR_EXPANDED_WIDTH;
+  const maxCollapsedWidth = isWideScreen ? TAB_BAR_COLLAPSED_WIDTH_WIDE : TAB_BAR_COLLAPSED_WIDTH;
+
+  const expandedWidth = Math.max(
+    280,
+    Math.min(windowWidth - horizontalMargin * 2, maxExpandedWidth),
+  );
+  const collapsedWidth = Math.max(
+    240,
+    Math.min(windowWidth - horizontalMargin * 2, Math.min(expandedWidth, maxCollapsedWidth)),
+  );
+
+  const expandedHorizontalOffset = Math.max(horizontalMargin, (windowWidth - expandedWidth) / 2);
+  const collapsedHorizontalOffset = Math.max(horizontalMargin, (windowWidth - collapsedWidth) / 2);
+
+  const tabSlotWidth = (expandedWidth - 8) / 5;
+  const collapsedTabSlotWidth = (collapsedWidth - 8) / 5;
 
   return {
     isWideScreen,
-    barWidth,
-    barHorizontalOffset,
+    barWidth: expandedWidth,
+    barHorizontalOffset: expandedHorizontalOffset,
     tabSlotWidth,
+    expandedWidth,
+    collapsedWidth,
+    expandedHorizontalOffset,
+    collapsedHorizontalOffset,
+    expandedTabSlotWidth: tabSlotWidth,
+    collapsedTabSlotWidth,
     expandedHeight: TAB_BAR_EXPANDED_HEIGHT,
     collapsedHeight: TAB_BAR_COLLAPSED_HEIGHT,
+  };
+}
+
+export function createAnimatedTabBarMetrics(labelsVisibility: Animated.Value, windowWidth: number) {
+  const metrics = computeFloatingTabBarMetrics(windowWidth);
+
+  const tabBarWidth = labelsVisibility.interpolate({
+    inputRange: [0, 1],
+    outputRange: [metrics.collapsedWidth, metrics.expandedWidth],
+  });
+
+  const tabBarHorizontalOffset = labelsVisibility.interpolate({
+    inputRange: [0, 1],
+    outputRange: [metrics.collapsedHorizontalOffset, metrics.expandedHorizontalOffset],
+  });
+
+  const tabBarHeight = labelsVisibility.interpolate({
+    inputRange: [0, 1],
+    outputRange: [metrics.collapsedHeight, metrics.expandedHeight],
+  });
+
+  return {
+    ...metrics,
+    tabBarWidth,
+    tabBarHorizontalOffset,
+    tabBarHeight,
   };
 }
 
