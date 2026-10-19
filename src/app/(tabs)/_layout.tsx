@@ -1,4 +1,4 @@
-import { useEffect, type ComponentType } from 'react';
+import { useEffect, useMemo, type ComponentType } from 'react';
 import {
   View,
   StyleSheet,
@@ -24,7 +24,7 @@ import { isValidUUID } from '@/utils/uuid';
 import {
   TabScrollProvider,
   useTabScroll,
-  computeFloatingTabBarMetrics,
+  createAnimatedTabBarMetrics,
 } from '@/context/TabScrollContext';
 
 function TabsLayoutContent() {
@@ -35,8 +35,11 @@ function TabsLayoutContent() {
   const family = useAppStore((s) => s.family);
   const { labelsVisibility, tabBarHeight, resetTabScroll } = useTabScroll();
 
-  // Floating dock dimensions — compact centered pill across Android, iOS, and Web
-  const { barWidth, barHorizontalOffset, tabSlotWidth } = computeFloatingTabBarMetrics(windowWidth);
+  // Floating dock dimensions — smoothly scales both vertically and horizontally
+  const { tabSlotWidth, tabBarWidth, tabBarHorizontalOffset } = useMemo(
+    () => createAnimatedTabBarMetrics(labelsVisibility, windowWidth),
+    [labelsVisibility, windowWidth],
+  );
   const floatingBottom = Math.max(insets.bottom, 12) + (Platform.OS === 'ios' ? 4 : 8);
 
   // Global Sync & Auth Lifecycle Bootstrap
@@ -187,11 +190,11 @@ function TabsLayoutContent() {
         tabBarStyle: {
           position: 'absolute',
           bottom: floatingBottom,
-          left: barHorizontalOffset,
-          right: barHorizontalOffset,
-          start: barHorizontalOffset,
-          end: barHorizontalOffset,
-          width: barWidth,
+          left: tabBarHorizontalOffset,
+          right: tabBarHorizontalOffset,
+          start: tabBarHorizontalOffset,
+          end: tabBarHorizontalOffset,
+          width: tabBarWidth,
           alignSelf: 'center',
           height: tabBarHeight,
           backgroundColor: 'transparent',
