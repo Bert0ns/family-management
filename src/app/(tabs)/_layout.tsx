@@ -15,7 +15,6 @@ import { LayoutDashboard, PieChart, ReceiptText, Users, Settings } from 'lucide-
 import { useTheme } from '@/theme';
 import { Radius } from '@/theme/tokens';
 import { useI18n } from '@/i18n';
-import { SyncBadge } from '@/components/common/SyncBadge';
 import { useAppStore } from '@/services/store';
 import { authService } from '@/services/authService';
 import { syncEngine } from '@/services/syncEngine';
@@ -255,25 +254,13 @@ function TabsLayoutContent() {
           padding: 0,
           margin: 0,
         },
-        headerStyle: {
-          backgroundColor: theme.colors.background,
-        },
-        headerTitleStyle: {
-          fontWeight: '700',
-          fontSize: 19,
-          color: theme.colors.textPrimary,
-        },
-        headerTintColor: theme.colors.textPrimary,
-        headerShadowVisible: false,
-        headerRight: () => <SyncBadge showLabel={false} />,
-        headerRightContainerStyle: { paddingRight: 16 },
+        headerShown: false,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: t.tabs.dashboard,
-          headerTitle: t.tabs.dashboard,
           tabBarIcon: ({ focused, color }) =>
             renderTabIcon(LayoutDashboard, focused, color, t.tabs.dashboard),
           tabBarAccessibilityLabel: t.tabs.dashboard,
@@ -283,7 +270,6 @@ function TabsLayoutContent() {
         name="ledger"
         options={{
           title: t.tabs.ledger,
-          headerTitle: t.tabs.ledger,
           tabBarIcon: ({ focused, color }) =>
             renderTabIcon(ReceiptText, focused, color, t.tabs.ledger),
           tabBarAccessibilityLabel: t.tabs.ledger,
@@ -293,7 +279,6 @@ function TabsLayoutContent() {
         name="analytics"
         options={{
           title: t.tabs.analytics,
-          headerTitle: t.tabs.analytics,
           tabBarIcon: ({ focused, color }) =>
             renderTabIcon(PieChart, focused, color, t.tabs.analytics),
           tabBarAccessibilityLabel: t.tabs.analytics,
@@ -303,7 +288,6 @@ function TabsLayoutContent() {
         name="family"
         options={{
           title: t.tabs.family,
-          headerTitle: t.tabs.family,
           tabBarIcon: ({ focused, color }) => renderTabIcon(Users, focused, color, t.tabs.family),
           tabBarAccessibilityLabel: t.tabs.family,
         }}
@@ -312,7 +296,6 @@ function TabsLayoutContent() {
         name="settings"
         options={{
           title: t.tabs.settings,
-          headerTitle: t.tabs.settings,
           tabBarIcon: ({ focused, color }) =>
             renderTabIcon(Settings, focused, color, t.tabs.settings),
           tabBarAccessibilityLabel: t.tabs.settings,
@@ -322,7 +305,6 @@ function TabsLayoutContent() {
         name="import"
         options={{
           title: t.tabs.import,
-          headerTitle: t.tabs.import,
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none', width: 0, height: 0, flex: 0 },
         }}

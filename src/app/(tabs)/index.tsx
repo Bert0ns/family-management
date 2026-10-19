@@ -9,6 +9,8 @@ import {
   type TextStyle,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SyncBadge } from '@/components/common/SyncBadge';
 import {
   Plus,
   FileJson,
@@ -16,7 +18,6 @@ import {
   ChevronRight,
   ArrowUpRight,
   ArrowDownRight,
-  TrendingUp,
 } from 'lucide-react-native';
 import { useTheme } from '@/theme';
 import { useI18n, getLocalizedCategoryName } from '@/i18n';
@@ -71,6 +72,7 @@ function formatGroupDateHeader(dateStr: string, locale: string): string {
 export default function DashboardScreen() {
   const router = useRouter();
   const { theme, spacing, radius, typography } = useTheme();
+  const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
   const { handleTabScroll } = useTabScroll();
   const [refreshing, setRefreshing] = useState(false);
@@ -219,7 +221,7 @@ export default function DashboardScreen() {
       style={{ flex: 1, backgroundColor: theme.colors.background }}
       contentContainerStyle={{
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.md,
+        paddingTop: Math.max(insets.top, spacing.md),
         paddingBottom: 132,
         maxWidth: 780,
         width: '100%',
@@ -268,35 +270,7 @@ export default function DashboardScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity
-          activeOpacity={0.75}
-          onPress={() => router.push('/(tabs)/analytics')}
-          accessibilityRole="button"
-          accessibilityLabel={t.tabs.analytics}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing.xs,
-            minHeight: 44,
-            paddingHorizontal: spacing.md,
-            paddingVertical: spacing.xs + 2,
-            borderRadius: radius.md,
-            backgroundColor: theme.colors.surface,
-            borderWidth: 1,
-            borderColor: theme.colors.cardBorder,
-          }}
-        >
-          <TrendingUp size={16} color={theme.colors.brand} strokeWidth={2.2} />
-          <Text
-            style={{
-              color: theme.colors.textPrimary,
-              fontSize: typography.fontSizes.sm,
-              fontWeight: typography.fontWeights.bold,
-            }}
-          >
-            {t.tabs.analytics}
-          </Text>
-        </TouchableOpacity>
+        <SyncBadge />
       </View>
 
       {/* 2. Month Stepper */}
@@ -546,7 +520,7 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* 3-Column Financial Metrics Strip (Separated by Structural Hairlines) */}
+        {/* 2-Column Financial Metrics Strip (Separated by Structural Hairlines) */}
         <View
           style={{
             flexDirection: 'row',
@@ -605,69 +579,6 @@ export default function DashboardScreen() {
             >
               {t.dashboard.burnRatePerDay}
             </Text>
-          </View>
-
-          {/* Top Spender */}
-          <View
-            style={{
-              flex: 1,
-              paddingVertical: spacing.md,
-              paddingHorizontal: spacing.md,
-              borderRightWidth: 1,
-              borderRightColor: theme.colors.border,
-            }}
-          >
-            <Text
-              style={{
-                color: theme.colors.textMuted,
-                fontSize: typography.fontSizes.xs,
-                fontWeight: typography.fontWeights.semibold,
-                marginBottom: 4,
-              }}
-              numberOfLines={1}
-            >
-              {t.dashboard.topSpender}
-            </Text>
-            {metrics.topSpender ? (
-              <>
-                <Text
-                  style={{
-                    color: theme.colors.textPrimary,
-                    fontSize: typography.fontSizes.md,
-                    fontWeight: typography.fontWeights.heavy,
-                  }}
-                  numberOfLines={1}
-                >
-                  {metrics.topSpender.member.display_name}
-                </Text>
-                <Text
-                  style={[
-                    {
-                      color: metrics.topSpender.member.color_code || theme.colors.brand,
-                      fontSize: 12,
-                      fontWeight: typography.fontWeights.bold,
-                      marginTop: 2,
-                    },
-                    TABULAR_NUMS,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {family.currency}
-                  {metrics.topSpender.total.toFixed(0)} ({metrics.topSpender.percentage.toFixed(0)}
-                  %)
-                </Text>
-              </>
-            ) : (
-              <Text
-                style={{
-                  color: theme.colors.textMuted,
-                  fontSize: typography.fontSizes.md,
-                  fontWeight: typography.fontWeights.bold,
-                }}
-              >
-                —
-              </Text>
-            )}
           </View>
 
           {/* Top Category */}

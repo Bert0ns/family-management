@@ -17,6 +17,7 @@ import { SAMPLE_IMPORT_REPORT } from '@/data/mockData';
 import { csvExporter } from '@/services/csvExporter';
 import { exportAndShareFile } from '@/services/fileExporter';
 import { importLogger } from '@/services/logger';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TABULAR_NUMS: TextStyle =
   Platform.OS === 'web'
@@ -25,6 +26,7 @@ const TABULAR_NUMS: TextStyle =
 
 export default function ImportScreen() {
   const { theme, spacing, radius, typography } = useTheme();
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const family = useAppStore((s) => s.family);
   const members = useAppStore((s) => s.members);
@@ -121,6 +123,7 @@ export default function ImportScreen() {
       style={{ flex: 1, backgroundColor: theme.colors.background }}
       contentContainerStyle={{
         padding: spacing.lg,
+        paddingTop: Math.max(insets.top, spacing.lg),
         paddingBottom: 130,
         maxWidth: 760,
         width: '100%',
