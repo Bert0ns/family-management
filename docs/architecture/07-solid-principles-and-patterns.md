@@ -74,23 +74,13 @@ Implemented in [`src/services/syncEngine.ts`](file:///home/berto/family-manageme
 
 ### 3.2 Observer / Event Emitter Pattern (Decoupled Store Reactivity)
 
-Implemented in [`src/services/store.ts`](file:///home/berto/family-management/src/services/store.ts#L112-L135). The store manages a `Set<StoreMutationListener>`. When any entity mutation (`expense`, `category`, `member`, `settlement`) is committed, all subscribers are notified with a typed payload. This decouples local state management from sync engines and telemetry loggers.
+Implemented in [`src/services/store.ts`](file:///home/berto/family-management/src/services/store.ts#L112-L135). The store manages a `Set<StoreMutationListener>`. When any entity mutation (`expense`, `category`, `member`) is committed, all subscribers are notified with a typed payload. This decouples local state management from sync engines and telemetry loggers.
 
-### 3.3 Strategy Pattern (Financial Split Engine)
-
-Implemented in [`src/services/splitCalculator.ts`](file:///home/berto/family-management/src/services/splitCalculator.ts#L7-L80). Splitting algorithms vary based on user requirements:
-
-- Equal Split Strategy (`calculateEqualSplits`)
-- Percentage Split Strategy
-- Exact Amount Strategy
-
-Each strategy satisfies the invariant that participant shares sum to the exact total transaction amount in integer cents.
-
-### 3.4 Facade Pattern (Supabase Integration Layer)
+### 3.3 Facade Pattern (Supabase Integration Layer)
 
 Implemented in [`src/services/supabase.ts`](file:///home/berto/family-management/src/services/supabase.ts#L1-L35). Masks the underlying configuration complexities, environment variable lookups, and client initialization behind a clean, unified facade (`supabase` and `isSupabaseConfigured()`).
 
-### 3.5 Adapter Pattern (Platform File Sharing & Export)
+### 3.4 Adapter Pattern (Platform File Sharing & Export)
 
 Implemented in [`src/services/fileExporter.ts`](file:///home/berto/family-management/src/services/fileExporter.ts#L15-L75). Adapts the file generation interface across two drastically different runtime environments:
 

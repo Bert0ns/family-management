@@ -9,7 +9,7 @@
 
 ## 1. Testing Pyramid & Verification Topology
 
-The testing architecture emphasizes deterministic business logic and state stability. Pure computational engines (cent splits, velocity curves, deduplication heuristics, schema parsing) reside at the base of the pyramid, executed in milliseconds under Node.js without device emulation overhead.
+The testing architecture emphasizes deterministic business logic and state stability. Pure computational engines (burn rates, velocity curves, deduplication heuristics, schema parsing) reside at the base of the pyramid, executed in milliseconds under Node.js without device emulation overhead.
 
 ```mermaid
 flowchart TB
@@ -18,7 +18,7 @@ flowchart TB
         E2E["End-to-End & PWA Asset Tests (5%)<br/>pwaAssets.test.js (manifest, icons, service worker)"]
         Integration["Integration & Sync Tests (15%)<br/>syncEngine.test.ts, realtimeSync.test.ts, authService.test.ts"]
         StateTests["Store & State Lifecycle Tests (25%)<br/>store.test.ts, store_remediation.test.ts, migrationService.test.ts"]
-        UnitTests["Unit & Domain Calculation Tests (55%)<br/>splitCalculator.test.ts, analytics.test.ts, validator.test.ts, duplicateDetector.test.ts"]
+        UnitTests["Unit & Domain Calculation Tests (55%)<br/>analytics.test.ts, validator.test.ts, duplicateDetector.test.ts"]
     end
 
     E2E --> Integration
@@ -35,8 +35,7 @@ The automated test suite contains **21 test suites comprising 134 individual tes
 | Test Suite File                                                                                                                     | Target Source File                                                                                                        | Tests | Key Behavioral Scenarios Verified                                               | Verification Command          |
 | :---------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :---- | :------------------------------------------------------------------------------ | :---------------------------- |
 | [`__tests__/analytics.test.ts`](file:///home/berto/family-management/__tests__/analytics.test.ts)                                   | [`src/services/analytics.ts`](file:///home/berto/family-management/src/services/analytics.ts)                             | 8     | Monthly KPI metrics, burn rates, velocity curves, category aggregations.        | `pnpm test analytics`         |
-| [`__tests__/splitCalculator.test.ts`](file:///home/berto/family-management/__tests__/splitCalculator.test.ts)                       | [`src/services/splitCalculator.ts`](file:///home/berto/family-management/src/services/splitCalculator.ts)                 | 10    | Cent-exact splits, remainder penny allocation, greedy debt simplification.      | `pnpm test splitCalculator`   |
-| [`__tests__/business_logic_remediation.test.ts`](file:///home/berto/family-management/__tests__/business_logic_remediation.test.ts) | [`src/services/splitCalculator.ts`](file:///home/berto/family-management/src/services/splitCalculator.ts)                 | 8     | Edge case splits with 0 members, zero amounts, large prime distributions.       | `pnpm test business_logic`    |
+| [`__tests__/business_logic_remediation.test.ts`](file:///home/berto/family-management/__tests__/business_logic_remediation.test.ts) | [`src/services/duplicateDetector.ts`](file:///home/berto/family-management/src/services/duplicateDetector.ts)             | 8     | Formula injection neutralization, duplicate substring safety.                   | `pnpm test business_logic`    |
 | [`__tests__/validator.test.ts`](file:///home/berto/family-management/__tests__/validator.test.ts)                                   | [`src/services/validator.ts`](file:///home/berto/family-management/src/services/validator.ts)                             | 7     | Zod parsing, invalid date rejection, EUR currency enforcement, positive limits. | `pnpm test validator`         |
 | [`__tests__/duplicateDetector.test.ts`](file:///home/berto/family-management/__tests__/duplicateDetector.test.ts)                   | [`src/services/duplicateDetector.ts`](file:///home/berto/family-management/src/services/duplicateDetector.ts)             | 9     | Token normalization, punctuation stripping, date + amount hash collision.       | `pnpm test duplicateDetector` |
 | [`__tests__/aiPromptGenerator.test.ts`](file:///home/berto/family-management/__tests__/aiPromptGenerator.test.ts)                   | [`src/services/aiPromptGenerator.ts`](file:///home/berto/family-management/src/services/aiPromptGenerator.ts)             | 6     | Category normalization, prompt formatting, household member injection.          | `pnpm test aiPrompt`          |

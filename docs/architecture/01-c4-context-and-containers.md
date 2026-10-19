@@ -74,12 +74,11 @@ flowchart TB
             LedgerModule["Ledger & Search Module<br/>(Filters, Search, Transaction Items)"]
             AnalyticsModule["Analytics Module<br/>(Category Pie, Spending Velocity, Heatmap)"]
             ImportModule["Import & Export Center<br/>(Dropzone, Zod Validator, CSV Stream)"]
-            ModalsModule["Modal Dialog Registry<br/>(SplitCalculator, AuthModal, PairingModal)"]
+            ModalsModule["Modal Dialog Registry<br/>(AuthModal, PairingModal, EditExpenseModal)"]
         end
 
         subgraph StateLayer ["2. Reactive State & Domain Logic Layer"]
             StoreState["Zustand Store Engine (useAppStore)<br/>(Centralized immutable state, mutation listeners)"]
-            SplitService["Split & Settlement Calculator<br/>(Cent-exact division, greedy debt reduction)"]
             AnalyticsService["Analytics Calculation Engine<br/>(Burn rate, velocity curves, MoM metrics)"]
             DeduplicationService["Duplicate Transaction Detector<br/>(Token normalization, temporal matching)"]
             ValidationService["Report Validator<br/>(Zod schema enforcement)"]
@@ -108,7 +107,7 @@ flowchart TB
         direction TB
         PostgRESTGateway["Supabase PostgREST API<br/>(HTTPS / RESTful data layer with JWT verification)"]
         GoTrueAuthService["GoTrue Authentication Engine<br/>(Identity provider, refresh tokens)"]
-        PostgresRDBMS[("PostgreSQL 15 Relational Database<br/>(families, expenses, splits, budgets tables with RLS)")]
+        PostgresRDBMS[("PostgreSQL 15 Relational Database<br/>(families, expenses, categories, family_members tables with RLS)")]
         RealtimeEngine["Realtime WebSocket Service<br/>(WAL logical replication broadcaster)"]
     end
 
@@ -119,7 +118,6 @@ flowchart TB
     PresentationLayer -->|"Triggers Vibration"| HapticsBridge
 
     %% Wiring state to domain & native
-    StoreState -->|"Executes Debt Math"| SplitService
     StoreState -->|"Dispatches Notifications"| NotificationBridge
     StoreState -->|"Emits StoreMutationEvent"| SyncEngineCore
 

@@ -86,7 +86,7 @@ flowchart TB
 - **Primary Objectives:**
   1. Add an optional remote error transport to [`src/services/logger.ts`](file:///home/berto/family-management/src/services/logger.ts) that reports warnings and errors when `process.env.EXPO_PUBLIC_SENTRY_DSN` is configured.
   2. Author and register an offline Service Worker (`public/sw.js`) with push and notificationclick listeners to support desktop web browser notifications.
-  3. Configure a Maestro UI flow in `.github/workflows/ci.yml` executing simulated add expense and split calculation user flows.
+  3. Configure a Maestro UI flow in `.github/workflows/ci.yml` executing simulated add expense and export user flows.
 
 ---
 

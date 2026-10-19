@@ -50,9 +50,8 @@ graph TB
 
     subgraph ModalRegistry ["Interactive Modal Registry (Components)"]
         direction TB
-        DetailModal["ExpenseDetailModal<br/>(Transaction inspection & splits)"]
+        DetailModal["ExpenseDetailModal<br/>(Transaction inspection & edit)"]
         CategoryDetailModal["CategoryDetailModal<br/>(Category drilldown & transaction list)"]
-        SplitCalcModal["SplitCalculator<br/>(Cent-exact split configurator)"]
         MemberModals["AddMemberModal / EditMemberModal<br/>(Member lifecycle & avatar selection)"]
         CategoryModal["AddCategoryModal<br/>(Category name, color, icon picker)"]
         ImportModals["ImportPreviewModal / PasteJsonModal<br/>(Staged record review & validation)"]
@@ -62,7 +61,6 @@ graph TB
     TabsGroup --> BottomTabs
     TabLedger -.->|"Opens inspection"| DetailModal
     TabAnalytics -.->|"Category tap drilldown"| CategoryDetailModal
-    DetailModal -.->|"Invokes custom split"| SplitCalcModal
     TabFamily -.->|"Manages household"| MemberModals
     TabFamily -.->|"Customizes tags"| CategoryModal
     TabImport -.->|"Previews JSON batch"| ImportModals
@@ -85,9 +83,9 @@ The following table catalogs all application routes, presentation styles, core U
 | [`src/app/(tabs)/ledger.tsx`](<file:///home/berto/family-management/src/app/(tabs)/ledger.tsx#L1-L320>)       | Tab Screen         | **Expense Ledger**: Searchable, filterable transaction list. Filter bar (category, payer, search), date grouping, expense detail trigger.                                                                                                | `Input`, `ExpenseItem`, `ExpenseDetailModal`, `OptionSelector`                                                                                                       | `expenses`, `filters`, `setFilters`, `resetFilters`        |
 | [`src/app/(tabs)/analytics.tsx`](<file:///home/berto/family-management/src/app/(tabs)/analytics.tsx#L1-L350>) | Tab Screen         | **Analytics**: Multi-tab financial insights. Spending velocity comparative chart, monthly trends with rolling averages, day-of-week patterns, payment method breakdown, category donut chart with drilldown modal, and heatmap calendar. | `SpendingVelocityChart`, `MonthlyTrendChart`, `DayOfWeekChart`, `PaymentMethodChart`, `CategoryPieChart`, `CategoryDetailModal`, `MemberBarChart`, `HeatmapCalendar` | `expenses`, `members`, `categories`, `selectedPeriod`      |
 | [`src/app/(tabs)/import.tsx`](<file:///home/berto/family-management/src/app/(tabs)/import.tsx#L1-L280>)       | Tab Screen         | **Import & Export Center**: JSON drag-and-drop dropzone, text paste modal, Zod schema viewer, AI statement prompt generator card, and CSV/JSON export actions.                                                                           | `JsonDropzone`, `AiPromptCard`, `SchemaViewer`, `ImportPreviewModal`, `PasteJsonModal`                                                                               | `importExpenseReport`, `expenses`, `categories`, `members` |
-| [`src/app/(tabs)/family.tsx`](<file:///home/berto/family-management/src/app/(tabs)/family.tsx#L1-L260>)       | Tab Screen         | **Family & Categories**: Family profile, member cards with color codes and roles, debt balance overview, custom category manager.                                                                                                        | `MemberCard`, `AddMemberModal`, `EditMemberModal`, `AddCategoryModal`                                                                                                | `family`, `members`, `categories`, `settlements`           |
+| [`src/app/(tabs)/family.tsx`](<file:///home/berto/family-management/src/app/(tabs)/family.tsx#L1-L260>)       | Tab Screen         | **Family & Categories**: Family profile, member cards with color codes and roles, debt balance overview, custom category manager.                                                                                                        | `MemberCard`, `AddMemberModal`, `EditMemberModal`, `AddCategoryModal`                                                                                                | `family`, `members`, `categories`                          |
 | [`src/app/(tabs)/settings.tsx`](<file:///home/berto/family-management/src/app/(tabs)/settings.tsx#L1-L250>)   | Tab Screen         | **Settings & Cloud Sync**: Theme selection (Light/Dark/System), Language switch (EN/IT), Notification preferences, Supabase Cloud Pairing, and sample data reset.                                                                        | `Card`, `Button`, `SyncBadge`, `AuthModal`, `FamilyPairingModal`                                                                                                     | `notificationPreferences`, `resetToSampleData`, `family`   |
-| [`src/app/expense/add.tsx`](file:///home/berto/family-management/src/app/expense/add.tsx#L1-L260)             | Stack Modal        | **Add/Edit Expense Form**: Modal sheet with numeric currency input, merchant name, category selector, payer selector, date picker, split config button, and notes.                                                                       | `Input`, `OptionSelector`, `Button`, `SplitCalculator`                                                                                                               | `addExpense`, `updateExpense`, `members`, `categories`     |
+| [`src/app/expense/add.tsx`](file:///home/berto/family-management/src/app/expense/add.tsx#L1-L260)             | Stack Modal        | **Add/Edit Expense Form**: Modal sheet with numeric currency input, merchant name, category selector, payer selector, date picker, and notes.                                                                                            | `Input`, `OptionSelector`, `Button`                                                                                                                                  | `addExpense`, `updateExpense`, `members`, `categories`     |
 
 ---
 
@@ -95,14 +93,14 @@ The following table catalogs all application routes, presentation styles, core U
 
 ### 3.1 Dashboard (`src/app/(tabs)/index.tsx`)
 
-- **Layout Structure:** Scrollable container with sticky period selector at the top. Top section features a 3-column KPI card grid (Total Spend, Daily Average Burn, Projected Month-End). Middle section contains the Member Contribution Ring and Debt Settlement preview. Bottom section contains the 5 most recent transactions with a "View All" shortcut to the Ledger.
+- **Layout Structure:** Scrollable container with sticky period selector at the top. Top section features a 3-column KPI card grid (Total Spend, Daily Average Burn, Projected Month-End). Middle section contains the Member Contribution Ring Bottom section contains the 5 most recent transactions with a "View All" shortcut to the Ledger.
 - **Store Bindings:** Reads `expenses`, `categories`, and `members` from [`useAppStore`](file:///home/berto/family-management/src/services/store.ts#L152). Selects current period via `selectedPeriod`.
 - **Responsive Adaptations:** On web and tablet screens ($> 768\text{px}$), the KPI grid expands from a vertical stack into a 3-column flex layout, and the recent expenses list displays two columns side by side.
 
 ### 3.2 Expense Ledger (`src/app/(tabs)/ledger.tsx`)
 
 - **Layout Structure:** Sticky search header containing a fuzzy search [`Input`](file:///home/berto/family-management/src/components/common/Input.tsx#L1-L65) and filter trigger button. Horizontal scrolling category filter chips. Virtualized `FlatList` of transactions grouped by transaction date with running totals per day.
-- **User Interactions:** Tapping an [`ExpenseItem`](file:///home/berto/family-management/src/components/ledger/ExpenseItem.tsx#L1-L90) triggers the [`ExpenseDetailModal`](file:///home/berto/family-management/src/components/ledger/ExpenseDetailModal.tsx#L1-L150) displaying split shares, notes, and delete/edit buttons. Floating Action Button (FAB) at bottom-right routes to `/expense/add`.
+- **User Interactions:** Tapping an [`ExpenseItem`](file:///home/berto/family-management/src/components/ledger/ExpenseItem.tsx#L1-L90) triggers the [`ExpenseDetailModal`](file:///home/berto/family-management/src/components/ledger/ExpenseDetailModal.tsx#L1-L150) displaying category, payer, notes, and delete/edit buttons. Floating Action Button (FAB) at bottom-right routes to `/expense/add`.
 - **Edge States:** Renders an animated empty state graphic if no transactions match active filters with a "Clear Filters" CTA.
 
 ### 3.3 Financial Analytics (`src/app/(tabs)/analytics.tsx`)
@@ -154,8 +152,6 @@ stateDiagram-v2
 
     state AddExpense {
         [*] --> FormInput
-        FormInput --> SplitConfig : Tap Split Type
-        SplitConfig --> FormInput : Confirm Custom Splits
         FormInput --> [*] : Submit Expense / Cancel
     }
 

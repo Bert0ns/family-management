@@ -12,9 +12,9 @@ A modern, privacy-first, cross-platform family expense tracking and financial an
   - **Category Distribution**: Interactive donut charts highlighting major expense buckets.
   - **Member Contribution Breakdown**: Comparative spending metrics per household member.
   - **Density Heatmap**: Daily spending activity calendar.
-- **🧾 Shared Household Ledger & Split Calculation**:
+- **🧾 Shared Household Ledger**:
   - Multi-criteria filtering by member, category, amount range, and fuzzy merchant search.
-  - Cent-exact split engine ensuring remainder pennies are fairly allocated without rounding errors.
+  - Real-time expense attribution per family member.
   - Automated duplicate transaction detection heuristic.
 - **📥 Structured JSON Import & Backup Export**:
   - Drag-and-drop or select structured `.json` expense reports with instant Zod schema validation.
@@ -51,7 +51,6 @@ The application includes a built-in import engine for bulk transaction ingestion
 | `notes`          | `string`  |   Optional   | Free-text notes or description                                                                                                  |
 | `payment_method` | `string`  |   Optional   | e.g. `"Credit Card"`, `"Bank Transfer"`, `"Cash"`                                                                               |
 | `is_recurring`   | `boolean` |   Optional   | `true` if this is a recurring monthly bill                                                                                      |
-| `split`          | `object`  |   Optional   | `{ is_split: boolean, type: "EQUAL" \| "PERCENTAGE" \| "EXACT", members?: string[] }`                                           |
 
 ### Complete JSON Example
 
@@ -73,12 +72,7 @@ The application includes a built-in import engine for bulk transaction ingestion
       "paid_by": "Berto",
       "notes": "Weekly family grocery shopping",
       "payment_method": "Credit Card",
-      "is_recurring": false,
-      "split": {
-        "is_split": true,
-        "type": "EQUAL",
-        "members": ["Berto", "Elena"]
-      }
+      "is_recurring": false
     },
     {
       "date": "2026-08-05",
@@ -134,7 +128,6 @@ family-management/
 │   ├── logger.test.ts          # Scoped logger & trace level tests
 │   ├── migrationService.test.ts # Schema migration & versioning tests
 │   ├── realtimeSync.test.ts    # Supabase Realtime broadcast & delta sync tests
-│   ├── splitCalculator.test.ts # Remainder-exact split math tests
 │   ├── store.test.ts           # State mutations, persistence & CRUD tests
 │   ├── store_remediation.test.ts # State recovery & atomic transition tests
 │   ├── syncEngine.test.ts      # Cloud synchronization & offline queue tests
@@ -159,11 +152,11 @@ family-management/
 │   │   ├── common/             # Button, Card, Avatar, Badge, KPIStat, OptionSelector, FormModal, IconHelper, Input, PeriodSelector, SyncBadge
 │   │   ├── family/             # MemberCard, AddMemberModal, EditMemberModal, AddCategoryModal
 │   │   ├── import/             # JsonDropzone, ImportPreviewModal, SchemaViewer
-│   │   ├── ledger/             # ExpenseItem, ExpenseDetailModal, SplitCalculator
+│   │   ├── ledger/             # ExpenseItem, ExpenseDetailModal, EditExpenseModal
 │   │   └── sync/               # AuthModal (OTP login), FamilyPairingModal (household code sharing)
 │   ├── data/                   # Mock seed data & Supabase SQL schema
 │   ├── i18n/                   # Typed translation dictionaries (EN & IT), categories & context
-│   ├── services/               # Analytics, Split, Duplicate, Sync, Realtime, Auth, Logger, Store, Migration
+│   ├── services/               # Analytics, Duplicate, Sync, Realtime, Auth, Logger, Store, Migration
 │   ├── theme/                  # Design tokens (colors, spacing, typography, radii) & ThemeContext
 │   ├── types/                  # Core domain models & Zod schemas
 │   └── utils/                  # Cryptographic UUID generator

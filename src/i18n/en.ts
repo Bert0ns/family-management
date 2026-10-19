@@ -208,7 +208,7 @@ export const en: TranslationSchema = {
     roleMember: 'Family Member',
     roleViewer: 'Viewer (Read-Only)',
     roleAdminDesc: 'Full access to add/edit expenses, members, and settings',
-    roleMemberDesc: 'Can add and view expenses and participate in splits',
+    roleMemberDesc: 'Can add and view household expenses',
     roleViewerDesc: 'Read-only access to view ledgers and charts',
     memberColorLabel: 'Avatar & Chart Color',
     editMemberTitle: 'Edit Family Member',
@@ -217,7 +217,7 @@ export const en: TranslationSchema = {
     deleteMember: 'Remove Member',
     deleteMemberConfirmTitle: 'Remove Member & All Data',
     deleteMemberConfirmMessage:
-      'Are you sure you want to remove this member? All expenses paid by this member and their split shares will be permanently deleted from the app.',
+      'Are you sure you want to remove this member? All expenses paid by this member will be permanently deleted from the app.',
     cannotDeleteLastMember: 'Cannot remove the only remaining member of the household.',
     permissionsTitle: 'Permissions & Access Role',
     memberDeletedSuccess: 'Member and related data removed successfully.',

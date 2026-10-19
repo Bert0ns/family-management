@@ -206,7 +206,7 @@ export const it: TranslationSchema = {
     roleMember: 'Membro della Famiglia',
     roleViewer: 'Osservatore (Sola Lettura)',
     roleAdminDesc: 'Accesso completo a spese, membri, importazioni e impostazioni',
-    roleMemberDesc: 'Può aggiungere e visualizzare spese e partecipare alle quote',
+    roleMemberDesc: 'Può aggiungere e visualizzare le spese del nucleo',
     roleViewerDesc: 'Accesso di sola lettura a registri e statistiche',
     memberColorLabel: 'Colore Avatar & Grafici',
     editMemberTitle: 'Modifica Membro della Famiglia',
@@ -215,7 +215,7 @@ export const it: TranslationSchema = {
     deleteMember: 'Rimuovi Membro',
     deleteMemberConfirmTitle: 'Rimuovere Membro e Dati?',
     deleteMemberConfirmMessage:
-      'Sei sicuro di voler rimuovere questo membro? Tutte le spese pagate da questo membro e le sue quote verranno eliminate definitivamente.',
+      'Sei sicuro di voler rimuovere questo membro? Tutte le spese pagate da questo membro verranno eliminate definitivamente.',
     cannotDeleteLastMember: "Impossibile rimuovere l'unico membro rimasto nel nucleo.",
     permissionsTitle: 'Permessi & Ruolo di Accesso',
     memberDeletedSuccess: 'Membro e dati associati rimossi con successo.',

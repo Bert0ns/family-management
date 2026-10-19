@@ -30,7 +30,7 @@ flowchart TB
         direction TB
         PostgRESTAPI["PostgREST API Server<br/>(Automated REST to SQL Mapper)"]
         RLSLayer["Row-Level Security (RLS) Engine<br/>(Tenancy Isolation by family_id)"]
-        PostgresTables[("PostgreSQL Tables<br/>• families<br/>• family_members<br/>• categories<br/>• expenses<br/>• expense_splits<br/>• settlements")]
+        PostgresTables[("PostgreSQL Tables<br/>• families<br/>• family_members<br/>• categories<br/>• expenses<br/>• import_batches<br/>• push_tokens")]
         WALReplication["Write-Ahead Log (WAL) Logical Replication"]
         RealtimeServer["Supabase Realtime Engine<br/>(Phoenix Channels WebSocket Server)"]
     end
@@ -57,17 +57,14 @@ The complete relational schema is declared in [`src/data/supabase_schema.sql`](f
 
 ### 2.1 Entity Relationship Catalog
 
-| Table Name       | Primary Key | Foreign Keys                                                       | Indexing & Constraints                   | Purpose & Lifecycle                                                     |
-| :--------------- | :---------- | :----------------------------------------------------------------- | :--------------------------------------- | :---------------------------------------------------------------------- |
-| `families`       | `id (UUID)` | None                                                               | `invite_code (UNIQUE)`                   | Root household container; defines shared currency (`€`).                |
-| `family_members` | `id (UUID)` | `family_id` → `families.id`, `user_id` → `auth.users.id`           | `role IN ('ADMIN', 'MEMBER', 'VIEWER')`  | Household member profiles with custom display names and color codes.    |
-| `categories`     | `id (UUID)` | `family_id` → `families.id`                                        | `family_id, name`                        | Expense categories with icons and color tags.                           |
-| `budgets`        | `id (UUID)` | `family_id` → `families.id`, `category_id` → `categories.id`       | `UNIQUE(family_id, category_id, period)` | Monthly spending ceilings per category and temporal period (`YYYY-MM`). |
-| `expenses`       | `id (UUID)` | `family_id`, `paid_by_member_id`, `category_id`, `import_batch_id` | `INDEX(family_id, transaction_date)`     | Core expense ledger; records amount, merchant, date, and notes.         |
-| `expense_splits` | `id (UUID)` | `expense_id` → `expenses.id`, `member_id` → `family_members.id`    | `CASCADE DELETE` on expense deletion     | Cent-exact share allocations among family members.                      |
-| `settlements`    | `id (UUID)` | `family_id`, `from_member_id`, `to_member_id`                      | `amount > 0`                             | Historical debt payment transfers between members.                      |
-| `import_batches` | `id (UUID)` | `family_id`, `imported_by_member_id`                               | None                                     | Audit log of batch JSON import operations.                              |
-| `push_tokens`    | `id (UUID)` | `user_id` → `auth.users.id`                                        | `UNIQUE(user_id, token)`                 | Native Expo push tokens for remote notification dispatch.               |
+| Table Name       | Primary Key | Foreign Keys                                                       | Indexing & Constraints                  | Purpose & Lifecycle                                                  |
+| :--------------- | :---------- | :----------------------------------------------------------------- | :-------------------------------------- | :------------------------------------------------------------------- |
+| `families`       | `id (UUID)` | None                                                               | `invite_code (UNIQUE)`                  | Root household container; defines shared currency (`€`).             |
+| `family_members` | `id (UUID)` | `family_id` → `families.id`, `user_id` → `auth.users.id`           | `role IN ('ADMIN', 'MEMBER', 'VIEWER')` | Household member profiles with custom display names and color codes. |
+| `categories`     | `id (UUID)` | `family_id` → `families.id`                                        | `family_id, name`                       | Expense categories with icons and color tags.                        |
+| `expenses`       | `id (UUID)` | `family_id`, `paid_by_member_id`, `category_id`, `import_batch_id` | `INDEX(family_id, transaction_date)`    | Core expense ledger; records amount, merchant, date, and notes.      |
+| `import_batches` | `id (UUID)` | `family_id`, `imported_by_member_id`                               | None                                    | Audit log of batch JSON import operations.                           |
+| `push_tokens`    | `id (UUID)` | `user_id` → `auth.users.id`                                        | `UNIQUE(user_id, token)`                | Native Expo push tokens for remote notification dispatch.            |
 
 ### 2.2 Row-Level Security (RLS) Policy Specifications
 
