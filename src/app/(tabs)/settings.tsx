@@ -7,6 +7,7 @@ import {
   Download,
   Trash2,
   Cloud,
+  AlertTriangle,
   Check,
   Edit2,
   Building,
@@ -68,6 +69,18 @@ export default function SettingsScreen() {
   const [authIntent, setAuthIntent] = useState<AuthIntent>('create');
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
+  const [dlqCount, setDlqCount] = useState<number>(0);
+  const [isRetryingDlq, setIsRetryingDlq] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = syncEngine.subscribeDeadLetterQueue((count) => {
+      setDlqCount(count);
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
+
   const pushEnabled = notificationPreferences.push_enabled;
 
   useEffect(() => {
@@ -99,6 +112,35 @@ export default function SettingsScreen() {
 
   const handleManualSync = async () => {
     await syncEngine.triggerManualSync(family?.id);
+  };
+
+  const handleRetryDlq = async () => {
+    setIsRetryingDlq(true);
+    try {
+      await syncEngine.retryDeadLetterQueue();
+    } finally {
+      setIsRetryingDlq(false);
+    }
+  };
+
+  const handleClearDlq = () => {
+    const title = t.sync.dlqClearConfirmTitle;
+    const message = t.sync.dlqClearConfirmMessage;
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${message}`)) {
+        syncEngine.clearDeadLetterQueue();
+      }
+    } else {
+      Alert.alert(title, message, [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.sync.dlqClearButton,
+          style: 'destructive',
+          onPress: () => syncEngine.clearDeadLetterQueue(),
+        },
+      ]);
+    }
   };
 
   const executeSignOut = async (wipeLocalData: boolean = false) => {
@@ -607,6 +649,82 @@ export default function SettingsScreen() {
           </View>
         )}
       </Card>
+
+      {/* 3.1 Dead Letter Queue (DLQ) Card */}
+      {dlqCount > 0 && (
+        <Card
+          padding="lg"
+          style={{
+            marginBottom: spacing.lg,
+            borderWidth: 1.5,
+            borderColor: theme.colors.danger,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: spacing.sm,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <AlertTriangle size={20} color={theme.colors.danger} strokeWidth={2.5} />
+              <Text
+                style={{
+                  color: theme.colors.textPrimary,
+                  fontSize: typography.fontSizes.lg,
+                  fontWeight: typography.fontWeights.bold,
+                }}
+              >
+                {t.sync.dlqTitle}
+              </Text>
+            </View>
+            <Badge
+              label={`${dlqCount} ${t.sync.dlqBadge}`}
+              color={theme.colors.danger}
+              size="sm"
+              variant="solid"
+            />
+          </View>
+
+          <Text
+            style={{
+              color: theme.colors.textSecondary,
+              fontSize: typography.fontSizes.sm,
+              marginBottom: spacing.md,
+              lineHeight: 20,
+            }}
+          >
+            {t.sync.dlqDescription}
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Button
+                title={isRetryingDlq ? t.sync.dlqRetryingButton : t.sync.dlqRetryButton}
+                variant="primary"
+                size="md"
+                disabled={isRetryingDlq}
+                icon={<RefreshCw size={16} color="#FFFFFF" strokeWidth={2.5} />}
+                onPress={handleRetryDlq}
+                fullWidth
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                title={t.sync.dlqClearButton}
+                variant="danger"
+                size="md"
+                disabled={isRetryingDlq}
+                icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2.5} />}
+                onPress={handleClearDlq}
+                fullWidth
+              />
+            </View>
+          </View>
+        </Card>
+      )}
 
       {/* 4. Notification Preferences Card */}
       <Card padding="lg" style={{ marginBottom: spacing.lg }}>

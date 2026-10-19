@@ -373,6 +373,14 @@ export interface TranslationSchema {
     joinHouseholdOption: string;
     signInJoinSubtitle: string;
     signInToJoinPrompt: string;
+    dlqTitle: string;
+    dlqDescription: string;
+    dlqBadge: string;
+    dlqRetryButton: string;
+    dlqRetryingButton: string;
+    dlqClearButton: string;
+    dlqClearConfirmTitle: string;
+    dlqClearConfirmMessage: string;
   };
   notifications: {
     title: string;
