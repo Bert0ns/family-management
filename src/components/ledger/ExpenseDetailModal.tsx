@@ -12,6 +12,8 @@ import {
   Animated,
   Easing,
   ViewStyle,
+  Pressable,
+  StyleSheet,
 } from 'react-native';
 import { Calendar, User, CreditCard, Trash2, X, Pencil, Tag } from 'lucide-react-native';
 import { useTheme } from '@/theme';
@@ -129,6 +131,12 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
           padding: isDesktop ? spacing.lg : 0,
         }}
       >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel={t.common.close}
+        />
         <Animated.View
           style={[
             {

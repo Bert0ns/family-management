@@ -18,6 +18,7 @@ import {
   Coins,
   RotateCcw,
   FileJson,
+  Calendar,
 } from 'lucide-react-native';
 import { useTheme } from '@/theme';
 import { useI18n, getLocalizedCategoryName } from '@/i18n';
@@ -142,6 +143,14 @@ export default function LedgerScreen() {
         return false;
       }
 
+      // Date range filter
+      if (filters.startDate && exp.transaction_date < filters.startDate) {
+        return false;
+      }
+      if (filters.endDate && exp.transaction_date > filters.endDate) {
+        return false;
+      }
+
       // Amount bracket filter
       if (!matchesAmountBracket(exp.amount, activeAmountBracket)) {
         return false;
@@ -241,6 +250,8 @@ export default function LedgerScreen() {
       searchQuery: '',
       selectedMemberId: undefined,
       selectedCategoryId: undefined,
+      startDate: undefined,
+      endDate: undefined,
     });
   };
 
@@ -263,6 +274,8 @@ export default function LedgerScreen() {
     Boolean(filters.searchQuery) ||
     Boolean(filters.selectedMemberId) ||
     Boolean(filters.selectedCategoryId) ||
+    Boolean(filters.startDate) ||
+    Boolean(filters.endDate) ||
     activePeriodPreset !== 'all' ||
     activeAmountBracket !== 'all';
 
@@ -270,6 +283,7 @@ export default function LedgerScreen() {
     (filters.searchQuery ? 1 : 0) +
     (filters.selectedMemberId ? 1 : 0) +
     (filters.selectedCategoryId ? 1 : 0) +
+    (filters.startDate || filters.endDate ? 1 : 0) +
     (activePeriodPreset !== 'all' ? 1 : 0) +
     (activeAmountBracket !== 'all' ? 1 : 0);
 
@@ -562,6 +576,40 @@ export default function LedgerScreen() {
                     }}
                   >
                     {amountOptions.find((a) => a.key === activeAmountBracket)?.label}
+                  </Text>
+                  <X size={14} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+
+              {(filters.startDate || filters.endDate) && (
+                <TouchableOpacity
+                  onPress={() => setFilters({ startDate: undefined, endDate: undefined })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${filters.startDate === filters.endDate ? filters.startDate : `${filters.startDate} - ${filters.endDate}`}, ${t.common.cancel}`}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    minHeight: 36,
+                    gap: 6,
+                    paddingVertical: 5,
+                    paddingHorizontal: spacing.sm + 2,
+                    borderRadius: radius.pill,
+                    backgroundColor: theme.colors.surfaceSubtle,
+                    borderWidth: 1.5,
+                    borderColor: theme.colors.brand,
+                  }}
+                >
+                  <Calendar size={14} color={theme.colors.brand} />
+                  <Text
+                    style={{
+                      color: theme.colors.textPrimary,
+                      fontSize: typography.fontSizes.xs,
+                      fontWeight: typography.fontWeights.bold,
+                    }}
+                  >
+                    {filters.startDate === filters.endDate
+                      ? filters.startDate
+                      : `${filters.startDate || ''} - ${filters.endDate || ''}`}
                   </Text>
                   <X size={14} color={theme.colors.textSecondary} />
                 </TouchableOpacity>

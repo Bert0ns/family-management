@@ -11,6 +11,8 @@ import {
   Animated,
   Easing,
   ViewStyle,
+  Pressable,
+  StyleSheet,
 } from 'react-native';
 import { X, Check } from 'lucide-react-native';
 import { useTheme } from '@/theme';
@@ -85,6 +87,12 @@ export const FormModal: React.FC<FormModalProps> = ({
           padding: isDesktop ? spacing.lg : 0,
         }}
       >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel={cancelTitle || 'Close'}
+        />
         <Animated.View
           style={[
             {

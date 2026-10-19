@@ -69,40 +69,76 @@ export const MemberBarChart: React.FC<MemberBarChartProps> = ({
       </Text>
 
       <View style={{ alignItems: 'center', marginTop: spacing.sm, width: '100%' }}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: '100%',
-            paddingVertical: spacing.xs,
-          }}
-        >
-          <BarChart
-            data={barData}
-            barWidth={36}
-            spacing={28}
-            barBorderTopLeftRadius={radius.sm}
-            barBorderTopRightRadius={radius.sm}
-            hideRules
-            xAxisThickness={1}
-            yAxisThickness={0}
-            xAxisColor={theme.colors.borderTactile}
-            yAxisTextStyle={{
-              color: theme.colors.textSecondary,
-              fontSize: typography.fontSizes.xs,
+        {data.length > 4 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '100%',
+              paddingVertical: spacing.xs,
             }}
-            xAxisLabelTextStyle={{
-              color: theme.colors.textPrimary,
-              fontSize: typography.fontSizes.sm,
-              fontWeight: typography.fontWeights.semibold,
+          >
+            <BarChart
+              data={barData}
+              barWidth={36}
+              spacing={28}
+              barBorderTopLeftRadius={radius.sm}
+              barBorderTopRightRadius={radius.sm}
+              hideRules
+              xAxisThickness={1}
+              yAxisThickness={0}
+              xAxisColor={theme.colors.borderTactile}
+              yAxisTextStyle={{
+                color: theme.colors.textSecondary,
+                fontSize: typography.fontSizes.xs,
+              }}
+              xAxisLabelTextStyle={{
+                color: theme.colors.textPrimary,
+                fontSize: typography.fontSizes.sm,
+                fontWeight: typography.fontWeights.semibold,
+              }}
+              noOfSections={4}
+              maxValue={maxTotal * 1.25}
+              height={180}
+            />
+          </ScrollView>
+        ) : (
+          <View
+            style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              paddingVertical: spacing.xs,
             }}
-            noOfSections={4}
-            maxValue={maxTotal * 1.25}
-            height={180}
-          />
-        </ScrollView>
+          >
+            <BarChart
+              data={barData}
+              barWidth={36}
+              spacing={data.length <= 2 ? 56 : 32}
+              barBorderTopLeftRadius={radius.sm}
+              barBorderTopRightRadius={radius.sm}
+              hideRules
+              xAxisThickness={1}
+              yAxisThickness={0}
+              xAxisColor={theme.colors.borderTactile}
+              yAxisTextStyle={{
+                color: theme.colors.textSecondary,
+                fontSize: typography.fontSizes.xs,
+              }}
+              xAxisLabelTextStyle={{
+                color: theme.colors.textPrimary,
+                fontSize: typography.fontSizes.sm,
+                fontWeight: typography.fontWeights.semibold,
+              }}
+              noOfSections={4}
+              maxValue={maxTotal * 1.25}
+              height={180}
+              disableScroll
+            />
+          </View>
+        )}
       </View>
 
       {/* Member cards list */}
