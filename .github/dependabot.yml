@@ -18,6 +18,11 @@ updates:
         dependency-type: 'production'
       dev-dependencies:
         dependency-type: 'development'
+    ignore:
+      # TypeScript 7 removes the JS compiler API in favor of native tsgo;
+      # typescript-eslint and ts-jest require TS < 6.1.0 until ecosystem support lands.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
 
   # Maintain GitHub Actions workflows on a weekly schedule
   - package-ecosystem: 'github-actions'
