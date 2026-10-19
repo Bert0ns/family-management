@@ -67,6 +67,21 @@ export const pairingService = {
         useAppStore.getState().updateFamilySettings({ invite_code: data.invite_code });
         return { code: data.invite_code, updated: true };
       }
+
+      // If remote family record exists but has no invite_code yet, persist local activeCode to Supabase
+      if (!famErr && data && !data.invite_code && activeCode) {
+        const famTable = supabase.from('families') as unknown as {
+          update?: (vals: unknown) => { eq: (col: string, val: string) => Promise<unknown> };
+        };
+        if (typeof famTable?.update === 'function') {
+          await famTable
+            .update({
+              invite_code: activeCode,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', familyId);
+        }
+      }
     } catch (err: any) {
       syncLogger.warn('Failed to sync remote invite code', { error: err?.message });
     }
@@ -142,12 +157,15 @@ export const pairingService = {
         p_display_name: displayName,
       });
 
-      if (rpcError || !rpcRes || !rpcRes.family_id) {
+      if (rpcError || !rpcRes || rpcRes.success === false || !rpcRes.family_id) {
         syncLogger.warn('join_family_via_invite_code RPC failed', {
-          error: rpcError?.message,
+          error: rpcError?.message || rpcRes?.error,
           rpcRes,
         });
-        return { success: false, error: rpcError?.message || 'INVALID_CODE' };
+        return {
+          success: false,
+          error: rpcError?.message || rpcRes?.error || 'INVALID_CODE',
+        };
       }
 
       const joinedFamilyId = rpcRes.family_id as string;

@@ -114,4 +114,70 @@ describe('Sync & Auth Remediation Tests (Partition 3)', () => {
     );
     expect(eqMock).toHaveBeenCalledWith('id', 'fam-123');
   });
+
+  it('sanitizes expense payload by stripping version and splits before upserting', async () => {
+    (isSupabaseConfigured as jest.Mock).mockReturnValue(true);
+
+    let capturedPayload: any;
+    const upsertMock = jest.fn().mockImplementation((payload) => {
+      capturedPayload = payload;
+      return Promise.resolve({ error: null });
+    });
+    (supabase.from as jest.Mock).mockReturnValue({ upsert: upsertMock });
+
+    const success = await syncEngine.executeMutation({
+      id: 'mut-exp-sanitized',
+      entity: 'expense',
+      operation: 'INSERT',
+      entity_id: 'exp-123',
+      payload: {
+        id: 'exp-123',
+        amount: 45.5,
+        version: 3,
+        splits: [{ member_id: 'mem-1', amount: 45.5 }],
+        description: 'Groceries',
+      },
+      retry_count: 0,
+      created_at: new Date().toISOString(),
+    });
+
+    expect(success).toBe(true);
+    expect(capturedPayload).toBeDefined();
+    expect(capturedPayload.version).toBeUndefined();
+    expect(capturedPayload.splits).toBeUndefined();
+    expect(capturedPayload.amount).toBe(45.5);
+    expect(capturedPayload.description).toBe('Groceries');
+  });
+
+  it('sanitizes member payload by stripping is_current_user and version before upserting', async () => {
+    (isSupabaseConfigured as jest.Mock).mockReturnValue(true);
+
+    let capturedPayload: any;
+    const upsertMock = jest.fn().mockImplementation((payload) => {
+      capturedPayload = payload;
+      return Promise.resolve({ error: null });
+    });
+    (supabase.from as jest.Mock).mockReturnValue({ upsert: upsertMock });
+
+    const success = await syncEngine.executeMutation({
+      id: 'mut-mem-sanitized',
+      entity: 'member',
+      operation: 'INSERT',
+      entity_id: 'mem-123',
+      payload: {
+        id: 'mem-123',
+        display_name: 'Alice',
+        is_current_user: true,
+        version: 2,
+      },
+      retry_count: 0,
+      created_at: new Date().toISOString(),
+    });
+
+    expect(success).toBe(true);
+    expect(capturedPayload).toBeDefined();
+    expect(capturedPayload.is_current_user).toBeUndefined();
+    expect(capturedPayload.version).toBeUndefined();
+    expect(capturedPayload.display_name).toBe('Alice');
+  });
 });

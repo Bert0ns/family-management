@@ -122,7 +122,11 @@ export const FamilyPairingModal: React.FC<FamilyPairingModalProps> = ({
         setError(t.sync.authRequiredToJoin);
       } else {
         setIsAuthRequired(false);
-        setError(res.error || t.sync.invalidCodeError);
+        const isInvalidCode =
+          !res.error ||
+          res.error === 'INVALID_CODE' ||
+          res.error.toLowerCase().includes('invalid invite code');
+        setError(isInvalidCode ? t.sync.invalidCodeError : res.error || t.sync.invalidCodeError);
       }
       return;
     }
