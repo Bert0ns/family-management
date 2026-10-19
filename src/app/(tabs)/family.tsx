@@ -16,6 +16,7 @@ import { Badge } from '@/components/common/Badge';
 import { FamilyMember, Category } from '@/types';
 import { sumBy, toCents, fromCents } from '@/utils/numberParser';
 import { useTabScroll } from '@/context/TabScrollContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TABULAR_NUMS: TextStyle =
   Platform.OS === 'web'
@@ -24,6 +25,7 @@ const TABULAR_NUMS: TextStyle =
 
 export default function FamilyScreen() {
   const { theme, spacing, radius, typography } = useTheme();
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { handleTabScroll } = useTabScroll();
 
@@ -74,6 +76,7 @@ export default function FamilyScreen() {
       style={{ flex: 1, backgroundColor: theme.colors.background }}
       contentContainerStyle={{
         padding: spacing.lg,
+        paddingTop: Math.max(insets.top, spacing.lg),
         paddingBottom: 130,
         maxWidth: 760,
         width: '100%',

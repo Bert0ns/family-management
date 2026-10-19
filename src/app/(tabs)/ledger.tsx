@@ -34,6 +34,7 @@ import { IconHelper } from '@/components/common/IconHelper';
 import { Expense, PeriodPreset, AmountBracket } from '@/types';
 import { sumBy } from '@/utils/numberParser';
 import { useTabScroll } from '@/context/TabScrollContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TABULAR_NUMS: TextStyle =
   Platform.OS === 'web'
@@ -84,6 +85,7 @@ export default function LedgerScreen() {
   const { theme, spacing, radius, typography } = useTheme();
   const { t } = useI18n();
   const { handleTabScroll } = useTabScroll();
+  const insets = useSafeAreaInsets();
 
   const family = useAppStore((s) => s.family);
   const members = useAppStore((s) => s.members);
@@ -278,7 +280,7 @@ export default function LedgerScreen() {
         <View
           style={{
             paddingHorizontal: spacing.lg,
-            paddingTop: spacing.lg,
+            paddingTop: Math.max(insets.top, spacing.lg),
             paddingBottom: spacing.sm,
             backgroundColor: theme.colors.surface,
             borderBottomWidth: 1.5,

@@ -34,8 +34,9 @@ import { pushNotificationService } from '@/services/pushNotificationService';
 import { AuthModal } from '@/components/sync/AuthModal';
 import { AuthIntent } from '@/services/authWorkflowService';
 import { FamilyPairingModal } from '@/components/sync/FamilyPairingModal';
-import { SyncBadge } from '@/components/common/SyncBadge';
 import { useTabScroll } from '@/context/TabScrollContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SyncBadge } from '@/components/common/SyncBadge';
 
 export default function SettingsScreen() {
   const {
@@ -48,6 +49,7 @@ export default function SettingsScreen() {
     radius,
     typography,
   } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const { t, locale, setLocale } = useI18n();
   const { handleTabScroll } = useTabScroll();
@@ -233,6 +235,7 @@ export default function SettingsScreen() {
       style={{ flex: 1, backgroundColor: theme.colors.background }}
       contentContainerStyle={{
         padding: spacing.lg,
+        paddingTop: Math.max(insets.top, spacing.lg),
         paddingBottom: 130,
         maxWidth: 760,
         width: '100%',
@@ -242,31 +245,6 @@ export default function SettingsScreen() {
       onScroll={handleTabScroll}
       scrollEventThrottle={16}
     >
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: spacing.lg,
-          gap: spacing.sm,
-        }}
-      >
-        <Text
-          style={{
-            color: theme.colors.textPrimary,
-            fontSize: typography.fontSizes.xxl,
-            fontWeight: typography.fontWeights.heavy,
-            flexShrink: 1,
-          }}
-          numberOfLines={1}
-        >
-          {t.settings.title}
-        </Text>
-        <View style={{ flexShrink: 0 }}>
-          <SyncBadge />
-        </View>
-      </View>
-
       {/* 1. Household Profile Card */}
       <Card padding="lg" style={{ marginBottom: spacing.lg }}>
         <View
@@ -474,20 +452,23 @@ export default function SettingsScreen() {
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: spacing.xs,
+            justifyContent: 'space-between',
             marginBottom: spacing.md,
           }}
         >
-          <Cloud size={20} color={theme.colors.brand} strokeWidth={2.5} />
-          <Text
-            style={{
-              color: theme.colors.textPrimary,
-              fontSize: typography.fontSizes.lg,
-              fontWeight: typography.fontWeights.bold,
-            }}
-          >
-            {t.settings.cloudSyncTitle}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Cloud size={20} color={theme.colors.brand} strokeWidth={2.5} />
+            <Text
+              style={{
+                color: theme.colors.textPrimary,
+                fontSize: typography.fontSizes.lg,
+                fontWeight: typography.fontWeights.bold,
+              }}
+            >
+              {t.settings.cloudSyncTitle}
+            </Text>
+          </View>
+          <SyncBadge />
         </View>
 
         {userEmail ? (
