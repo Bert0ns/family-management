@@ -70,20 +70,23 @@ export const pairingService = {
 
       // If remote family record exists but has no invite_code yet, persist local activeCode to Supabase
       if (!famErr && data && !data.invite_code && activeCode) {
-        const famTable = supabase.from('families') as unknown as {
-          update?: (vals: unknown) => { eq: (col: string, val: string) => Promise<unknown> };
-        };
-        if (typeof famTable?.update === 'function') {
-          await famTable
-            .update({
-              invite_code: activeCode,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', familyId);
+        const { error: updateErr } = await supabase
+          .from('families')
+          .update({
+            invite_code: activeCode,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', familyId);
+
+        if (updateErr) {
+          syncLogger.warn('Failed to update remote invite code on family', {
+            error: updateErr.message,
+          });
         }
       }
-    } catch (err: any) {
-      syncLogger.warn('Failed to sync remote invite code', { error: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      syncLogger.warn('Failed to sync remote invite code', { error: message });
     }
 
     return { code: activeCode, updated: false };
@@ -114,9 +117,10 @@ export const pairingService = {
       useAppStore.getState().updateFamilySettings({ invite_code: newCode });
       syncLogger.info('Household invite code regenerated successfully', { familyId, newCode });
       return { success: true, code: newCode };
-    } catch (err: any) {
-      syncLogger.error('Exception regenerating invite code', { error: err?.message });
-      return { success: false, error: err?.message || 'Failed to regenerate code' };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      syncLogger.error('Exception regenerating invite code', { error: message });
+      return { success: false, error: message };
     }
   },
 
@@ -158,13 +162,14 @@ export const pairingService = {
       });
 
       if (rpcError || !rpcRes || rpcRes.success === false || !rpcRes.family_id) {
+        const errorMsg = rpcError?.message || rpcRes?.error || 'INVALID_CODE';
         syncLogger.warn('join_family_via_invite_code RPC failed', {
-          error: rpcError?.message || rpcRes?.error,
+          error: errorMsg,
           rpcRes,
         });
         return {
           success: false,
-          error: rpcError?.message || rpcRes?.error || 'INVALID_CODE',
+          error: errorMsg,
         };
       }
 
@@ -216,19 +221,22 @@ export const pairingService = {
       await syncEngine.fetchDelta(remoteFamily.id);
 
       return { success: true, familyId: joinedFamilyId };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       syncLogger.error('Unexpected exception during joinFamilyByInviteCode', {
-        error: err?.message,
+        error: message,
       });
-      return { success: false, error: err?.message || 'INVALID_CODE' };
+      return { success: false, error: message };
     }
   },
 
   /**
    * Creates a new household family record.
    */
-  async createFamily(name: string, currency: '€' = '€'): Promise<CreateFamilyResult> {
+  async createFamily(name: string = 'My Family', currency: '€' = '€'): Promise<CreateFamilyResult> {
     try {
+      realtimeSync.stopRealtimeSync();
+
       const familyId = generateUUID();
       const inviteCode = generateInviteCode(6);
       const now = new Date().toISOString();
@@ -263,9 +271,17 @@ export const pairingService = {
       });
 
       return { success: true, family: newFamily };
-    } catch (err: any) {
-      syncLogger.error('Failed to create family', { error: err?.message });
-      return { success: false, error: err?.message || 'Failed to create family' };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      syncLogger.error('Failed to create family', { error: message });
+      return { success: false, error: message };
     }
+  },
+
+  /**
+   * Leaves the current cloud family and provisions a new independent local household.
+   */
+  async leaveFamily(newFamilyName: string = 'My Family'): Promise<CreateFamilyResult> {
+    return this.createFamily(newFamilyName);
   },
 };

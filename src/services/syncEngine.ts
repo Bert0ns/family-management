@@ -251,6 +251,23 @@ function notifyStatus(status: SyncStatus) {
   });
 }
 
+/**
+ * Sanitizes mutation payloads by stripping internal or client-only properties
+ * before sending to Supabase tables.
+ */
+function sanitizeMutationPayload<T extends Record<string, unknown>>(
+  payload: T,
+): Record<string, unknown> {
+  const excludedKeys = new Set(['version', 'splits', 'is_current_user', 'previous_category_id']);
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (!excludedKeys.has(key) && value !== undefined) {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
 export const syncEngine = {
   getSyncStatus(): SyncStatus {
     return currentSyncStatus;
@@ -519,15 +536,10 @@ export const syncEngine = {
     switch (entity) {
       case 'expense': {
         if (operation === 'INSERT' || operation === 'UPDATE') {
-          const {
-            previous_category_id: _prevCatId,
-            version: _version,
-            splits: _splits,
-            ...sanitizedPayload
-          } = payload;
+          const sanitizedPayload = sanitizeMutationPayload(payload);
           const query = supabase.from('expenses').upsert({
             ...sanitizedPayload,
-            updated_at: sanitizedPayload.updated_at || new Date().toISOString(),
+            updated_at: (sanitizedPayload.updated_at as string) || new Date().toISOString(),
           });
           const result = await executeWithServerTimestamp<Expense>(query);
           if (result.error) throw result.error;
@@ -553,10 +565,10 @@ export const syncEngine = {
 
       case 'category': {
         if (operation === 'INSERT' || operation === 'UPDATE') {
-          const { version: _version, ...sanitizedCategory } = payload;
+          const sanitizedCategory = sanitizeMutationPayload(payload);
           const query = supabase.from('categories').upsert({
             ...sanitizedCategory,
-            updated_at: sanitizedCategory.updated_at || new Date().toISOString(),
+            updated_at: (sanitizedCategory.updated_at as string) || new Date().toISOString(),
           });
           const result = await executeWithServerTimestamp<Category>(query);
           if (result.error) throw result.error;
@@ -582,10 +594,10 @@ export const syncEngine = {
 
       case 'member': {
         if (operation === 'INSERT' || operation === 'UPDATE') {
-          const { is_current_user: _isCurrentUser, version: _version, ...memberData } = payload;
+          const memberData = sanitizeMutationPayload(payload);
           const query = supabase.from('family_members').upsert({
             ...memberData,
-            updated_at: memberData.updated_at || new Date().toISOString(),
+            updated_at: (memberData.updated_at as string) || new Date().toISOString(),
           });
           const result = await executeWithServerTimestamp<FamilyMember>(query);
           if (result.error) throw result.error;
@@ -696,15 +708,38 @@ export const syncEngine = {
 
         if (!famErr && remoteFamily) {
           const currentFamily = useAppStore.getState().family;
+          const resolvedInviteCode = remoteFamily.invite_code || currentFamily.invite_code;
           useAppStore.setState({
             family: {
               ...currentFamily,
               name: remoteFamily.name,
               currency: remoteFamily.currency || currentFamily.currency,
-              invite_code: remoteFamily.invite_code || currentFamily.invite_code,
+              invite_code: resolvedInviteCode,
               updated_at: remoteFamily.updated_at,
             },
           });
+
+          if (!remoteFamily.invite_code && currentFamily.invite_code && isValidUUID(familyId)) {
+            void (async () => {
+              try {
+                const { error: updateErr } = await supabase
+                  .from('families')
+                  .update({
+                    invite_code: currentFamily.invite_code,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', familyId);
+                if (updateErr) {
+                  supabaseLogger.warn('Failed to push invite code in fetchDelta', {
+                    error: updateErr.message,
+                  });
+                }
+              } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : String(err);
+                supabaseLogger.warn('Exception pushing invite code in fetchDelta', { error: msg });
+              }
+            })();
+          }
         }
       } catch (famErr) {
         supabaseLogger.warn('Optional family delta fetch skipped', { error: famErr });
@@ -882,6 +917,21 @@ export const syncEngine = {
       notifyStatus('error');
       return { updatedCount: 0 };
     }
+  },
+
+  /**
+   * Orchestrates a manual sync operation: flushes pending outbox mutations
+   * and pulls the latest cloud delta for the active family.
+   */
+  async triggerManualSync(familyId?: string): Promise<{ flushed: number; updatedCount: number }> {
+    const activeFamilyId = familyId || useAppStore.getState().family.id;
+    if (!activeFamilyId || !isValidUUID(activeFamilyId)) {
+      return { flushed: 0, updatedCount: 0 };
+    }
+
+    const flushRes = await this.flushOutbox();
+    const deltaRes = await this.fetchDelta(activeFamilyId);
+    return { flushed: flushRes.processed, updatedCount: deltaRes.updatedCount };
   },
 
   mergeExpensesLWW(remoteList: Expense[]) {
