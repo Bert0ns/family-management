@@ -285,14 +285,14 @@ jobs:
 
       - name: Download Android Artifacts
         if: needs.build-android.result == 'success'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: android-release-apk
           path: release-assets
 
       - name: Download Web Artifacts
         if: needs.build-web.result == 'success'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: web-release-bundle
           path: release-assets
@@ -312,7 +312,7 @@ jobs:
           ls -la
 
       - name: Create or Update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           target_commitish: ${{ github.sha }}
