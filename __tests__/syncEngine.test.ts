@@ -4,6 +4,8 @@ import {
   hasUnresolvedDependencies,
   sortMutationsByDependency,
   executeWithServerTimestamp,
+  fetchAllPaginated,
+  DEAD_LETTER_QUEUE_STORAGE_KEY,
 } from '@/services/syncEngine';
 import { supabase, isSupabaseConfigured } from '@/services/supabase';
 import { useAppStore } from '@/services/store';
@@ -1149,6 +1151,178 @@ describe('syncEngine', () => {
       const res = await syncEngine.fetchDelta('fam_1');
       expect(res).toEqual({ updatedCount: 0 });
       expect(syncEngine.getSyncStatus()).toBe('error');
+    });
+  });
+
+  describe('fetchAllPaginated', () => {
+    it('paginates across multiple chunks of records using range()', async () => {
+      const page1 = Array.from({ length: 10 }, (_, i) => ({ id: `rec-${i}` }));
+      const page2 = Array.from({ length: 5 }, (_, i) => ({ id: `rec-${10 + i}` }));
+
+      const queryBuilder = jest.fn().mockImplementation(() => {
+        const builder: any = {
+          range: jest.fn().mockImplementation((from: number, _to: number) => {
+            if (from === 0) {
+              return Promise.resolve({ data: page1, error: null });
+            }
+            if (from === 10) {
+              return Promise.resolve({ data: page2, error: null });
+            }
+            return Promise.resolve({ data: [], error: null });
+          }),
+        };
+        return builder;
+      });
+
+      const { data, error } = await fetchAllPaginated<{ id: string }>(queryBuilder, 10);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(15);
+      expect(data[0].id).toBe('rec-0');
+      expect(data[14].id).toBe('rec-14');
+      expect(queryBuilder).toHaveBeenCalledTimes(2);
+    });
+
+    it('falls back to single resolution when range() is not available', async () => {
+      const records = [{ id: 'item-1' }, { id: 'item-2' }];
+      const queryBuilder = jest
+        .fn()
+        .mockReturnValue(Promise.resolve({ data: records, error: null }));
+
+      const { data, error } = await fetchAllPaginated<{ id: string }>(queryBuilder, 10);
+      expect(error).toBeNull();
+      expect(data).toEqual(records);
+    });
+
+    it('returns error when query response contains error', async () => {
+      const queryBuilder = jest
+        .fn()
+        .mockReturnValue(Promise.resolve({ data: null, error: { message: 'Database failed' } }));
+
+      const { error } = await fetchAllPaginated(queryBuilder, 10);
+      expect(error?.message).toBe('Database failed');
+    });
+  });
+
+  describe('Dead Letter Queue (DLQ) Management', () => {
+    it('returns DLQ count correctly and updates subscribers', async () => {
+      const dlqItem: OutboxMutation = {
+        id: 'dlq-1',
+        entity: 'expense',
+        operation: 'INSERT',
+        entity_id: 'exp-fail-1',
+        payload: { id: 'exp-fail-1', amount: 100 },
+        retry_count: 5,
+        created_at: new Date().toISOString(),
+      };
+
+      await AsyncStorage.setItem(DEAD_LETTER_QUEUE_STORAGE_KEY, JSON.stringify([dlqItem]));
+
+      const initialCount = await syncEngine.getDeadLetterQueueCount();
+      expect(initialCount).toBe(1);
+
+      const listener = jest.fn();
+      const unsub = syncEngine.subscribeDeadLetterQueue(listener);
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      // Receives current count upon subscription
+      expect(listener).toHaveBeenCalledWith(1);
+
+      await syncEngine.clearDeadLetterQueue();
+      expect(listener).toHaveBeenCalledWith(0);
+      expect(await syncEngine.getDeadLetterQueueCount()).toBe(0);
+
+      unsub();
+    });
+
+    it('retries DLQ mutations by re-enqueuing into outbox with reset retry_count and clearing DLQ', async () => {
+      (isSupabaseConfigured as jest.Mock).mockReturnValue(false);
+
+      const dlqItems: OutboxMutation[] = [
+        {
+          id: 'dlq-item-1',
+          entity: 'expense',
+          operation: 'INSERT',
+          entity_id: 'exp-dlq-1',
+          payload: { id: 'exp-dlq-1', amount: 42 },
+          retry_count: 5,
+          created_at: new Date().toISOString(),
+        },
+      ];
+
+      await AsyncStorage.setItem(DEAD_LETTER_QUEUE_STORAGE_KEY, JSON.stringify(dlqItems));
+
+      const dlqSubscriber = jest.fn();
+      const unsub = syncEngine.subscribeDeadLetterQueue(dlqSubscriber);
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      expect(dlqSubscriber).toHaveBeenCalledWith(1);
+
+      const result = await syncEngine.retryDeadLetterQueue();
+      expect(result.reattempted).toBe(1);
+
+      // DLQ count should be 0 and subscriber notified
+      expect(await syncEngine.getDeadLetterQueueCount()).toBe(0);
+      expect(dlqSubscriber).toHaveBeenCalledWith(0);
+
+      // Mutation is restored to outbox with retry_count reset to 0
+      const outbox = await syncEngine.getOutbox();
+      expect(outbox).toHaveLength(1);
+      expect(outbox[0].id).toBe('dlq-item-1');
+      expect(outbox[0].retry_count).toBe(0);
+
+      unsub();
+    });
+  });
+
+  describe('Outbox Flush Cycle Race Condition Prevention', () => {
+    it('automatically triggers a second flush cycle when mutations arrive while a flush is in progress', async () => {
+      (isSupabaseConfigured as jest.Mock).mockReturnValue(true);
+
+      const executedIds: string[] = [];
+
+      let resolveSlowMutation: (() => void) | undefined;
+      const slowMutationPromise = new Promise<boolean>((resolve) => {
+        resolveSlowMutation = () => resolve(true);
+      });
+
+      jest.spyOn(syncEngine, 'executeMutation').mockImplementation(async (mutation) => {
+        executedIds.push(mutation.entity_id);
+        if (mutation.entity_id === 'exp-first') {
+          return slowMutationPromise;
+        }
+        return true;
+      });
+
+      // Enqueue first mutation
+      await syncEngine.enqueueMutation({
+        entity: 'expense',
+        operation: 'INSERT',
+        entity_id: 'exp-first',
+        payload: { id: 'exp-first', amount: 10 },
+      });
+
+      // Start initial flush (which will pause on mut-first)
+      const flushPromise = syncEngine.flushOutbox();
+
+      // Concurrently enqueue a second mutation while the first flush cycle is executing
+      await syncEngine.enqueueMutation({
+        entity: 'expense',
+        operation: 'INSERT',
+        entity_id: 'exp-second',
+        payload: { id: 'exp-second', amount: 20 },
+      });
+
+      // Resolve the slow mutation to allow the cycle to finish
+      resolveSlowMutation!();
+
+      // Wait for flushOutbox to complete all pending cycles
+      await flushPromise;
+
+      // Both mutations must have been processed by the sequential re-triggered flush loop
+      expect(executedIds).toContain('exp-first');
+      expect(executedIds).toContain('exp-second');
+
+      // Outbox must be completely empty
+      const remainingOutbox = await syncEngine.getOutbox();
+      expect(remainingOutbox).toHaveLength(0);
     });
   });
 });

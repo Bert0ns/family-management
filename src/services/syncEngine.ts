@@ -8,6 +8,7 @@ import { generateUUID, isValidUUID } from '@/utils/uuid';
 export const OUTBOX_STORAGE_KEY = '@bert0ns_sync_outbox';
 export const LAST_SYNC_STORAGE_KEY = '@bert0ns_last_sync_timestamp';
 export const DEAD_LETTER_QUEUE_STORAGE_KEY = '@bert0ns_sync_dead_letter_queue';
+export const SYNC_PAGE_SIZE = 1000;
 
 class AsyncMutex {
   private mutex = Promise.resolve();
@@ -233,9 +234,51 @@ export async function executeWithServerTimestamp<
   return res || {};
 }
 
+/**
+ * Helper to fetch all pages of a PostgREST query in chunks (default 1000 items)
+ * to prevent silent truncation at PostgREST's default 1,000-row limit.
+ */
+export async function fetchAllPaginated<T = Record<string, unknown>>(
+  buildQuery: () => any,
+  pageSize: number = SYNC_PAGE_SIZE,
+): Promise<{ data: T[]; error: { message?: string } | null }> {
+  const allData: T[] = [];
+  let page = 0;
+
+  while (true) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+
+    const initialQuery = buildQuery();
+    const hasRange = typeof initialQuery?.range === 'function';
+    const query = hasRange ? initialQuery.range(from, to) : initialQuery;
+
+    const { data, error } = await query;
+    if (error) {
+      return { data: allData, error };
+    }
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      break;
+    }
+
+    allData.push(...(data as T[]));
+
+    if (data.length < pageSize || !hasRange) {
+      break;
+    }
+
+    page++;
+  }
+
+  return { data: allData, error: null };
+}
+
 let currentSyncStatus: SyncStatus = 'offline';
 let activeFlushPromise: Promise<{ processed: number; errors: number }> | null = null;
+let hasPendingFlush = false;
 const statusListeners = new Set<(status: SyncStatus) => void>();
+const dlqListeners = new Set<(count: number) => void>();
 
 function notifyStatus(status: SyncStatus) {
   if (currentSyncStatus !== status) {
@@ -247,6 +290,16 @@ function notifyStatus(status: SyncStatus) {
       listener(status);
     } catch (err) {
       supabaseLogger.error('Error in sync status listener', { error: err });
+    }
+  });
+}
+
+function notifyDlqListeners(count: number) {
+  dlqListeners.forEach((listener) => {
+    try {
+      listener(count);
+    } catch (err) {
+      supabaseLogger.error('Error in DLQ listener', { error: err });
     }
   });
 }
@@ -278,6 +331,16 @@ export const syncEngine = {
     listener(currentSyncStatus);
     return () => {
       statusListeners.delete(listener);
+    };
+  },
+
+  subscribeDeadLetterQueue(listener: (count: number) => void): () => void {
+    dlqListeners.add(listener);
+    this.getDeadLetterQueueCount()
+      .then(listener)
+      .catch(() => listener(0));
+    return () => {
+      dlqListeners.delete(listener);
     };
   },
 
@@ -327,12 +390,61 @@ export const syncEngine = {
     }
   },
 
+  async getDeadLetterQueueCount(): Promise<number> {
+    try {
+      const dlq = await this.getDeadLetterQueue();
+      return dlq.length;
+    } catch {
+      return 0;
+    }
+  },
+
   async clearDeadLetterQueue(): Promise<void> {
     return outboxMutex.runExclusive(async () => {
       try {
         await AsyncStorage.removeItem(DEAD_LETTER_QUEUE_STORAGE_KEY);
+        notifyDlqListeners(0);
       } catch (err) {
         supabaseLogger.error('Failed to clear dead letter queue', { error: err });
+      }
+    });
+  },
+
+  async retryDeadLetterQueue(): Promise<{ reattempted: number }> {
+    return outboxMutex.runExclusive(async () => {
+      try {
+        const dlq = await this.getDeadLetterQueue();
+        if (dlq.length === 0) {
+          return { reattempted: 0 };
+        }
+
+        const outbox = await this.getOutbox();
+        const resetItems: OutboxMutation[] = dlq.map((item) => ({
+          ...item,
+          retry_count: 0,
+          next_retry_at: undefined,
+          last_error: undefined,
+        }));
+
+        await AsyncStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify([...outbox, ...resetItems]));
+        await AsyncStorage.removeItem(DEAD_LETTER_QUEUE_STORAGE_KEY);
+
+        syncLogger.info('DLQ items re-enqueued to outbox for retry', {
+          count: resetItems.length,
+        });
+
+        notifyDlqListeners(0);
+
+        if (isSupabaseConfigured()) {
+          this.flushOutbox().catch((err) => {
+            supabaseLogger.debug('Retry DLQ flush deferred', { error: err });
+          });
+        }
+
+        return { reattempted: resetItems.length };
+      } catch (err) {
+        supabaseLogger.error('Failed to retry dead letter queue', { error: err });
+        return { reattempted: 0 };
       }
     });
   },
@@ -346,6 +458,7 @@ export const syncEngine = {
           DEAD_LETTER_QUEUE_STORAGE_KEY,
         ]);
         currentSyncStatus = 'offline';
+        notifyDlqListeners(0);
         syncLogger.info('All sync outbox, DLQ, and timestamp data cleared from storage');
       } catch (err) {
         supabaseLogger.error('Failed to clear all sync data from storage', { error: err });
@@ -386,12 +499,132 @@ export const syncEngine = {
       }
     });
 
+    if (activeFlushPromise) {
+      hasPendingFlush = true;
+    }
+
     // Attempt background flush if online
     if (isSupabaseConfigured()) {
       this.flushOutbox().catch((err) => {
         supabaseLogger.debug('Background flush deferred', { error: err });
       });
     }
+  },
+
+  async performFlushCycle(): Promise<{ processed: number; errors: number }> {
+    const outbox = await this.getOutbox();
+    if (outbox.length === 0) {
+      return { processed: 0, errors: 0 };
+    }
+
+    const now = Date.now();
+    // Filter items ready for attempt (respecting exponential backoff) and topologically sort
+    const itemsToAttempt = sortMutationsByDependency(
+      outbox.filter((item) => !item.next_retry_at || new Date(item.next_retry_at).getTime() <= now),
+    );
+
+    if (itemsToAttempt.length === 0) {
+      syncLogger.debug('All pending outbox items are currently in backoff delay');
+      return { processed: 0, errors: 0 };
+    }
+
+    syncLogger.info('Starting outbox flush cycle', {
+      outboxCount: outbox.length,
+      attemptCount: itemsToAttempt.length,
+    });
+    notifyStatus('syncing');
+    let processed = 0;
+    let errors = 0;
+    const succeededIds = new Set<string>();
+    const failedMap = new Map<string, OutboxMutation>();
+    const deadLetterItems: OutboxMutation[] = [];
+
+    for (const item of itemsToAttempt) {
+      if (hasUnresolvedDependencies(item, outbox, succeededIds)) {
+        syncLogger.info('Mutation deferred due to pending preceding dependency', {
+          id: item.id,
+          entity: item.entity,
+          operation: item.operation,
+          entity_id: item.entity_id,
+        });
+        continue;
+      }
+
+      try {
+        const success = await this.executeMutation(item);
+        if (success) {
+          processed++;
+          succeededIds.add(item.id);
+        } else {
+          errors++;
+          const newRetryCount = (item.retry_count || 0) + 1;
+          const backoffMs = calculateBackoffDelay(newRetryCount);
+          const updatedItem: OutboxMutation = {
+            ...item,
+            retry_count: newRetryCount,
+            next_retry_at: new Date(Date.now() + backoffMs).toISOString(),
+            last_error: 'Mutation returned false',
+          };
+          if (newRetryCount >= 5) {
+            deadLetterItems.push(updatedItem);
+          } else {
+            failedMap.set(item.id, updatedItem);
+          }
+        }
+      } catch (execErr: unknown) {
+        errors++;
+        const newRetryCount = (item.retry_count || 0) + 1;
+        const backoffMs = calculateBackoffDelay(newRetryCount);
+        const errorMsg =
+          execErr instanceof Error
+            ? execErr.message
+            : isRecord(execErr) && typeof execErr.message === 'string'
+              ? execErr.message
+              : String(execErr);
+        const updatedItem: OutboxMutation = {
+          ...item,
+          retry_count: newRetryCount,
+          next_retry_at: new Date(Date.now() + backoffMs).toISOString(),
+          last_error: errorMsg,
+        };
+        if (newRetryCount >= 5) {
+          deadLetterItems.push(updatedItem);
+        } else {
+          failedMap.set(item.id, updatedItem);
+        }
+      }
+    }
+
+    // Apply changes to AsyncStorage safely using mutex
+    await outboxMutex.runExclusive(async () => {
+      // If any items reached max retries, move to Dead Letter Queue
+      if (deadLetterItems.length > 0) {
+        const dlq = await this.getDeadLetterQueue();
+        const updatedDlq = [...dlq, ...deadLetterItems];
+        await AsyncStorage.setItem(DEAD_LETTER_QUEUE_STORAGE_KEY, JSON.stringify(updatedDlq));
+        syncLogger.warn('Mutations moved to dead letter queue', {
+          count: deadLetterItems.length,
+        });
+        notifyDlqListeners(updatedDlq.length);
+      }
+
+      // Re-read current outbox to safely preserve any mutations enqueued concurrently
+      const freshOutbox = await this.getOutbox();
+      const deadLetterIds = new Set(deadLetterItems.map((m) => m.id));
+      const updatedOutbox = freshOutbox
+        .filter((m) => !succeededIds.has(m.id) && !deadLetterIds.has(m.id))
+        .map((m) => failedMap.get(m.id) || m);
+
+      await AsyncStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(updatedOutbox));
+      syncLogger.info('Outbox flush cycle completed', {
+        processed,
+        errors,
+        dlqCount: deadLetterItems.length,
+        remaining: updatedOutbox.length,
+      });
+    });
+
+    return { processed, errors };
   },
 
   async flushOutbox(): Promise<{ processed: number; errors: number }> {
@@ -401,129 +634,47 @@ export const syncEngine = {
     }
 
     if (activeFlushPromise) {
+      hasPendingFlush = true;
       return activeFlushPromise;
     }
 
     activeFlushPromise = (async () => {
+      let totalProcessed = 0;
+      let totalErrors = 0;
+
       try {
-        const outbox = await this.getOutbox();
-        if (outbox.length === 0) {
-          notifyStatus('synced');
-          return { processed: 0, errors: 0 };
-        }
+        while (true) {
+          hasPendingFlush = false;
+          const cycleResult = await this.performFlushCycle();
+          totalProcessed += cycleResult.processed;
+          totalErrors += cycleResult.errors;
 
-        const now = Date.now();
-        // Filter items ready for attempt (respecting exponential backoff) and topologically sort
-        const itemsToAttempt = sortMutationsByDependency(
-          outbox.filter(
-            (item) => !item.next_retry_at || new Date(item.next_retry_at).getTime() <= now,
-          ),
-        );
-
-        if (itemsToAttempt.length === 0) {
-          syncLogger.debug('All pending outbox items are currently in backoff delay');
-          return { processed: 0, errors: 0 };
-        }
-
-        syncLogger.info('Starting outbox flush', {
-          outboxCount: outbox.length,
-          attemptCount: itemsToAttempt.length,
-        });
-        notifyStatus('syncing');
-        let processed = 0;
-        let errors = 0;
-        const succeededIds = new Set<string>();
-        const failedMap = new Map<string, OutboxMutation>();
-        const deadLetterItems: OutboxMutation[] = [];
-
-        for (const item of itemsToAttempt) {
-          if (hasUnresolvedDependencies(item, outbox, succeededIds)) {
-            syncLogger.info('Mutation deferred due to pending preceding dependency', {
-              id: item.id,
-              entity: item.entity,
-              operation: item.operation,
-              entity_id: item.entity_id,
-            });
-            continue;
+          // If no items were processed or had errors in this cycle, stop
+          if (cycleResult.processed === 0 && cycleResult.errors === 0) {
+            break;
           }
 
-          try {
-            const success = await this.executeMutation(item);
-            if (success) {
-              processed++;
-              succeededIds.add(item.id);
-            } else {
-              errors++;
-              const newRetryCount = (item.retry_count || 0) + 1;
-              const backoffMs = calculateBackoffDelay(newRetryCount);
-              const updatedItem: OutboxMutation = {
-                ...item,
-                retry_count: newRetryCount,
-                next_retry_at: new Date(Date.now() + backoffMs).toISOString(),
-                last_error: 'Mutation returned false',
-              };
-              if (newRetryCount >= 5) {
-                deadLetterItems.push(updatedItem);
-              } else {
-                failedMap.set(item.id, updatedItem);
-              }
-            }
-          } catch (execErr: unknown) {
-            errors++;
-            const newRetryCount = (item.retry_count || 0) + 1;
-            const backoffMs = calculateBackoffDelay(newRetryCount);
-            const errorMsg =
-              execErr instanceof Error
-                ? execErr.message
-                : isRecord(execErr) && typeof execErr.message === 'string'
-                  ? execErr.message
-                  : String(execErr);
-            const updatedItem: OutboxMutation = {
-              ...item,
-              retry_count: newRetryCount,
-              next_retry_at: new Date(Date.now() + backoffMs).toISOString(),
-              last_error: errorMsg,
-            };
-            if (newRetryCount >= 5) {
-              deadLetterItems.push(updatedItem);
-            } else {
-              failedMap.set(item.id, updatedItem);
-            }
+          // If no concurrent mutations arrived during this cycle, stop
+          if (!hasPendingFlush) {
+            break;
           }
+          syncLogger.info(
+            'Re-triggering outbox flush due to concurrent mutations arriving during flush',
+          );
         }
 
-        // Apply changes to AsyncStorage safely using mutex
-        await outboxMutex.runExclusive(async () => {
-          // If any items reached max retries, move to Dead Letter Queue
-          if (deadLetterItems.length > 0) {
-            const dlq = await this.getDeadLetterQueue();
-            const updatedDlq = [...dlq, ...deadLetterItems];
-            await AsyncStorage.setItem(DEAD_LETTER_QUEUE_STORAGE_KEY, JSON.stringify(updatedDlq));
-            syncLogger.warn('Mutations moved to dead letter queue', {
-              count: deadLetterItems.length,
-            });
-          }
-
-          // Re-read current outbox to safely preserve any mutations enqueued concurrently
-          const freshOutbox = await this.getOutbox();
-          const deadLetterIds = new Set(deadLetterItems.map((m) => m.id));
-          const updatedOutbox = freshOutbox
-            .filter((m) => !succeededIds.has(m.id) && !deadLetterIds.has(m.id))
-            .map((m) => failedMap.get(m.id) || m);
-
-          await AsyncStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(updatedOutbox));
-          syncLogger.info('Outbox flush completed', {
-            processed,
-            errors,
-            dlqCount: deadLetterItems.length,
-            remaining: updatedOutbox.length,
-          });
-        });
-
-        notifyStatus(errors > 0 ? 'error' : 'synced');
-        return { processed, errors };
+        notifyStatus(totalErrors > 0 ? 'error' : 'synced');
+        return { processed: totalProcessed, errors: totalErrors };
       } finally {
         activeFlushPromise = null;
+        if (hasPendingFlush) {
+          hasPendingFlush = false;
+          this.flushOutbox().catch((err) => {
+            supabaseLogger.debug('Re-triggered outbox flush after cycle completion failed', {
+              error: err,
+            });
+          });
+        }
       }
     })();
 
@@ -627,6 +778,7 @@ export const syncEngine = {
             .from('families')
             .update({
               name: payload.name,
+              currency: payload.currency || 'EUR',
               ...(payload.invite_code ? { invite_code: payload.invite_code } : {}),
               updated_at: new Date().toISOString(),
             })
@@ -745,28 +897,36 @@ export const syncEngine = {
         supabaseLogger.warn('Optional family delta fetch skipped', { error: famErr });
       }
 
-      // 1. Fetch updated expenses (including soft-deleted tombstones)
-      let expQuery = supabase.from('expenses').select('*').eq('family_id', familyId);
-      if (lastSync) {
-        expQuery = expQuery.or(`updated_at.gt.${lastSync},deleted_at.gt.${lastSync}`);
-      }
-      const { data: remoteExpenses, error: expErr } = await expQuery;
+      // 1. Fetch updated expenses (including soft-deleted tombstones) paginated
+      const { data: remoteExpenses, error: expErr } = await fetchAllPaginated<RawExpenseRow>(() => {
+        let expQuery = supabase.from('expenses').select('*').eq('family_id', familyId);
+        if (lastSync) {
+          expQuery = expQuery.or(`updated_at.gt.${lastSync},deleted_at.gt.${lastSync}`);
+        }
+        return expQuery;
+      });
       if (expErr) throw expErr;
 
-      // 2. Fetch updated categories (including soft-deleted tombstones)
-      let catQuery = supabase.from('categories').select('*').eq('family_id', familyId);
-      if (lastSync) {
-        catQuery = catQuery.or(`updated_at.gt.${lastSync},deleted_at.gt.${lastSync}`);
-      }
-      const { data: remoteCategories, error: catErr } = await catQuery;
+      // 2. Fetch updated categories (including soft-deleted tombstones) paginated
+      const { data: remoteCategories, error: catErr } = await fetchAllPaginated<RawCategoryRow>(
+        () => {
+          let catQuery = supabase.from('categories').select('*').eq('family_id', familyId);
+          if (lastSync) {
+            catQuery = catQuery.or(`updated_at.gt.${lastSync},deleted_at.gt.${lastSync}`);
+          }
+          return catQuery;
+        },
+      );
       if (catErr) throw catErr;
 
-      // 3. Fetch updated members (including soft-deleted tombstones)
-      let memQuery = supabase.from('family_members').select('*').eq('family_id', familyId);
-      if (lastSync) {
-        memQuery = memQuery.or(`updated_at.gt.${lastSync},deleted_at.gt.${lastSync}`);
-      }
-      const { data: remoteMembers, error: memErr } = await memQuery;
+      // 3. Fetch updated members (including soft-deleted tombstones) paginated
+      const { data: remoteMembers, error: memErr } = await fetchAllPaginated<RawMemberRow>(() => {
+        let memQuery = supabase.from('family_members').select('*').eq('family_id', familyId);
+        if (lastSync) {
+          memQuery = memQuery.or(`updated_at.gt.${lastSync},deleted_at.gt.${lastSync}`);
+        }
+        return memQuery;
+      });
       if (memErr) throw memErr;
 
       let count = 0;
@@ -833,12 +993,16 @@ export const syncEngine = {
         count += mappedMembers.length;
       }
 
-      // 4. Fetch updated import batches
-      let batchQuery = supabase.from('import_batches').select('*').eq('family_id', familyId);
-      if (lastSync) {
-        batchQuery = batchQuery.or(`updated_at.gt.${lastSync},created_at.gt.${lastSync}`);
-      }
-      const { data: remoteBatches, error: batchErr } = await batchQuery;
+      // 4. Fetch updated import batches paginated
+      const { data: remoteBatches, error: batchErr } = await fetchAllPaginated<RawImportBatchRow>(
+        () => {
+          let batchQuery = supabase.from('import_batches').select('*').eq('family_id', familyId);
+          if (lastSync) {
+            batchQuery = batchQuery.or(`updated_at.gt.${lastSync},created_at.gt.${lastSync}`);
+          }
+          return batchQuery;
+        },
+      );
       if (batchErr) throw batchErr;
 
       if (remoteBatches && remoteBatches.length > 0) {

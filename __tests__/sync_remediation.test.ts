@@ -180,4 +180,31 @@ describe('Sync & Auth Remediation Tests (Partition 3)', () => {
     expect(capturedPayload.version).toBeUndefined();
     expect(capturedPayload.display_name).toBe('Alice');
   });
+  it('re-attempts failed DLQ mutations when retryDeadLetterQueue is called', async () => {
+    (isSupabaseConfigured as jest.Mock).mockReturnValue(false);
+
+    await AsyncStorage.setItem(
+      '@bert0ns_sync_dead_letter_queue',
+      JSON.stringify([
+        {
+          id: 'dlq-rem-1',
+          entity: 'expense',
+          operation: 'INSERT',
+          entity_id: 'exp-rem-1',
+          payload: { id: 'exp-rem-1', amount: 99 },
+          retry_count: 5,
+          created_at: new Date().toISOString(),
+        },
+      ]),
+    );
+
+    expect(await syncEngine.getDeadLetterQueueCount()).toBe(1);
+
+    const retryResult = await syncEngine.retryDeadLetterQueue();
+    expect(retryResult.reattempted).toBe(1);
+    expect(await syncEngine.getDeadLetterQueueCount()).toBe(0);
+
+    const outbox = await syncEngine.getOutbox();
+    expect(outbox.some((m) => m.id === 'dlq-rem-1' && m.retry_count === 0)).toBe(true);
+  });
 });

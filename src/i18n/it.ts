@@ -131,10 +131,10 @@ export const it: TranslationSchema = {
     filterPreset3Months: 'Ultimi 3 Mesi',
     filterPresetYear: "Quest'Anno",
     amountAll: 'Qualsiasi Importo',
-    amountUnder20: '< 20\u20ac',
-    amount20to100: '20\u20ac - 100\u20ac',
-    amountOver100: '> 100\u20ac',
-    filterSummary: 'Mostrate {count} spese \u2022 Totale: {total}',
+    amountUnder20: '< 20€',
+    amount20to100: '20€ - 100€',
+    amountOver100: '> 100€',
+    filterSummary: 'Mostrate {count} spese • Totale: {total}',
     applyFilters: 'Applica Filtri',
     clearFilters: 'Azzera Filtri',
     bulkImportButton: 'Importa (JSON)',
@@ -166,9 +166,9 @@ export const it: TranslationSchema = {
     totalAmount: 'Importo Totale',
     importTransactions: 'Importa Transazioni',
     duplicateWarning: 'possibili duplicati rilevati. Verranno comunque importati se confermi.',
-    aiPromptTitle: 'Estrai Spese con l\u2019AI',
+    aiPromptTitle: 'Estrai Spese con l’AI',
     aiPromptSubtitle:
-      'Copia un prompt ottimizzato per ChatGPT, Claude o Gemini per convertire l\u2019estratto conto PDF bancario in un file JSON importabile.',
+      'Copia un prompt ottimizzato per ChatGPT, Claude o Gemini per convertire l’estratto conto PDF bancario in un file JSON importabile.',
     copyPrompt: 'Copia Prompt AI',
     promptCopied: 'Prompt copiato negli appunti!',
     viewPrompt: 'Visualizza Prompt',
@@ -176,7 +176,7 @@ export const it: TranslationSchema = {
     promptModalSubtitle: 'Generato dinamicamente con le tue {count} categorie di spesa attive.',
     pasteJsonTitle: 'Incolla Testo JSON',
     pasteJsonSubtitle:
-      'Incolla direttamente l\u2019output JSON del tuo assistente AI senza dover salvare file.',
+      'Incolla direttamente l’output JSON del tuo assistente AI senza dover salvare file.',
     pasteJsonButton: 'Elabora e Mostra Spese',
     pasteJsonPlaceholder:
       'Incolla qui il JSON (i blocchi di codice markdown ```json vengono rimossi automaticamente)...',
@@ -243,7 +243,7 @@ export const it: TranslationSchema = {
     householdProfile: 'Profilo Nucleo Familiare',
     familyNameLabel: 'Nome Spazio Famiglia',
     currencyLabel: 'Valuta Principale',
-    currencySubtitle: 'Valuta supportata (solo EUR \u20ac).',
+    currencySubtitle: 'Valuta supportata (solo EUR €).',
     appearanceLanguage: 'Aspetto & Lingua',
     themeLabel: 'Tema Visivo',
     themeLight: 'Chiaro',
@@ -281,7 +281,7 @@ export const it: TranslationSchema = {
     privacyGuaranteeDescription:
       'I tuoi dati finanziari rimangono strettamente privati e locali. Nessun servizio IA di terze parti analizza le tue spese.',
     localFirstBadge: 'Locale',
-    privacyGuaranteeFooter: 'Persistenza 100% sul Dispositivo + Supabase Piano Gratuito ($0)',
+    privacyGuaranteeFooter: 'Persistenza 100% sul Dispositivo + Supabase Piano Gratuito (0€)',
   },
   addExpense: {
     title: 'Aggiungi Nuova Spesa',
@@ -394,6 +394,16 @@ export const it: TranslationSchema = {
     joinHouseholdOption: 'Unisciti a Famiglia Esistente',
     signInJoinSubtitle: 'Accedi con la tua email per unirti a una famiglia con un codice invito.',
     signInToJoinPrompt: 'Accedi per Unirti',
+    dlqTitle: 'Errori di Sincronizzazione',
+    dlqDescription:
+      'Alcune modifiche non sono state sincronizzate dopo diversi tentativi. Puoi riprovare ora o cancellare la coda degli errori.',
+    dlqBadge: 'Sincronizzazioni Fallite',
+    dlqRetryButton: 'Riprova Sincronizzazione',
+    dlqRetryingButton: 'Ripristino in corso...',
+    dlqClearButton: 'Svuota Coda Errori',
+    dlqClearConfirmTitle: 'Cancellare la Coda Errori?',
+    dlqClearConfirmMessage:
+      'Le mutazioni fallite verranno eliminate definitivamente dalla coda. Le modifiche non sincronizzate non saranno inviate al cloud.',
   },
   notifications: {
     title: 'Notifiche e Avvisi',
