@@ -9,6 +9,8 @@ import {
   useWindowDimensions,
   Animated,
   Easing,
+  Pressable,
+  StyleSheet,
 } from 'react-native';
 import { X, Tag } from 'lucide-react-native';
 import { useTheme } from '@/theme';
@@ -83,6 +85,12 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
           padding: isDesktop ? spacing.lg : 0,
         }}
       >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel={t.common.close}
+        />
         <Animated.View
           style={[
             {

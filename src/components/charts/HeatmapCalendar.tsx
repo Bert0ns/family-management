@@ -1,7 +1,9 @@
-import React from 'react';
-import { View, Text } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { Filter, X } from 'lucide-react-native';
 import { useTheme } from '@/theme';
 import { useI18n } from '@/i18n';
+import { useAppStore } from '@/services/store';
 import { DailySpendPoint } from '@/services/analytics';
 import { Card } from '@/components/common/Card';
 import { hexToRgba } from '@/utils/color';
@@ -10,6 +12,8 @@ interface HeatmapCalendarProps {
   data: DailySpendPoint[];
   period: string; // YYYY-MM
   currency?: string;
+  onSelectDay?: (date: string, amount: number) => void;
+  onFilterLedger?: (date: string) => void;
 }
 
 export function parseSafePeriod(period?: string): {
@@ -51,10 +55,15 @@ export function parseSafePeriod(period?: string): {
 export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
   data,
   period,
-  currency: _currency = '€',
+  currency = '€',
+  onSelectDay,
+  onFilterLedger,
 }) => {
   const { theme, spacing, radius, typography } = useTheme();
   const { t, locale } = useI18n();
+  const setFilters = useAppStore((s) => s.setFilters);
+
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const maxDaily = data.reduce((max, d) => Math.max(max, d.dailyAmount), 10);
 
@@ -67,7 +76,7 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
     return theme.colors.brand;
   };
 
-  const { adjustedFirstDay, daysInMonth } = parseSafePeriod(period);
+  const { year, month, adjustedFirstDay, daysInMonth } = parseSafePeriod(period);
 
   const dateLocale = locale === 'it' ? 'it-IT' : 'en-US';
   const dayHeaders = Array.from({ length: 7 }).map((_, i) => {
@@ -75,6 +84,51 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
     return d.toLocaleDateString(dateLocale, { weekday: 'narrow' });
   });
   const colWidth = `${100 / 7}%` as const;
+
+  const selectedDayData =
+    selectedDay !== null ? data.find((d) => d.day === selectedDay) : undefined;
+  const selectedAmount = selectedDayData ? selectedDayData.dailyAmount : 0;
+  const selectedIsoDate =
+    selectedDay !== null
+      ? selectedDayData?.dateStr || `${period}-${String(selectedDay).padStart(2, '0')}`
+      : '';
+  const selectedFormattedDate =
+    selectedDay !== null
+      ? new Date(year, month - 1, selectedDay).toLocaleDateString(dateLocale, {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+      : '';
+
+  const handleDayPress = (dayNum: number, amount: number, isoDate: string) => {
+    if (selectedDay === dayNum) {
+      setSelectedDay(null);
+    } else {
+      setSelectedDay(dayNum);
+      onSelectDay?.(isoDate, amount);
+    }
+  };
+
+  const handleFilterLedger = (isoDate: string) => {
+    setFilters({
+      startDate: isoDate,
+      endDate: isoDate,
+      periodPreset: 'all',
+    });
+    if (onFilterLedger) {
+      onFilterLedger(isoDate);
+      return;
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { router } = require('expo-router');
+      router.push('/(tabs)/ledger');
+    } catch {
+      // Safe fallback in test environments
+    }
+  };
 
   return (
     <Card padding="md">
@@ -121,6 +175,24 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
           const amount = dayData ? dayData.dailyAmount : 0;
           const cellBg = getHeatColor(amount);
           const isHigh = amount > maxDaily * 0.5;
+          const isSelected = selectedDay === dayNum;
+          const isoDate = dayData?.dateStr || `${period}-${String(dayNum).padStart(2, '0')}`;
+
+          const dateObj = new Date(year, month - 1, dayNum);
+          const formattedDate = dateObj.toLocaleDateString(dateLocale, {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          });
+
+          const accessibilityLabel =
+            amount > 0
+              ? locale === 'it'
+                ? `${formattedDate}: ${currency}${amount.toFixed(2)} spesi`
+                : `${formattedDate}: ${currency}${amount.toFixed(2)} spent`
+              : locale === 'it'
+                ? `${formattedDate}: nessuna spesa`
+                : `${formattedDate}: no expenses`;
 
           return (
             <View
@@ -131,29 +203,135 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
                 padding: 2,
               }}
             >
-              <View
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleDayPress(dayNum, amount, isoDate)}
+                accessibilityRole="button"
+                accessibilityLabel={accessibilityLabel}
+                accessibilityState={{ selected: isSelected }}
+                accessibilityHint={
+                  amount > 0
+                    ? locale === 'it'
+                      ? 'Tocca per visualizzare il totale o filtrare il ledger'
+                      : 'Tap to view total or filter ledger'
+                    : undefined
+                }
                 style={{
                   flex: 1,
                   borderRadius: radius.xs,
                   backgroundColor: cellBg,
                   alignItems: 'center',
                   justifyContent: 'center',
+                  borderWidth: isSelected ? 2 : 0,
+                  borderColor: isSelected ? theme.colors.textPrimary : 'transparent',
                 }}
               >
                 <Text
                   style={{
                     fontSize: 10,
-                    fontWeight: typography.fontWeights.semibold,
+                    fontWeight: isSelected
+                      ? typography.fontWeights.heavy
+                      : typography.fontWeights.semibold,
                     color: isHigh ? theme.colors.textInverse : theme.colors.textPrimary,
                   }}
                 >
                   {dayNum}
                 </Text>
-              </View>
+              </TouchableOpacity>
             </View>
           );
         })}
       </View>
+
+      {/* Interactive Day Details Popover / Tooltip */}
+      {selectedDay !== null && (
+        <View
+          style={{
+            marginTop: spacing.md,
+            padding: spacing.md,
+            backgroundColor: theme.isDark
+              ? theme.colors.surfaceContainerHigh
+              : theme.colors.surfaceSubtle,
+            borderRadius: radius.sm,
+            borderWidth: 1.5,
+            borderColor: theme.colors.borderTactile,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: spacing.sm,
+          }}
+        >
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              style={{
+                color: theme.colors.textSecondary,
+                fontSize: typography.fontSizes.xs,
+                fontWeight: typography.fontWeights.medium,
+                textTransform: 'capitalize',
+              }}
+              numberOfLines={1}
+            >
+              {selectedFormattedDate}
+            </Text>
+            <Text
+              style={{
+                color: theme.colors.textPrimary,
+                fontSize: typography.fontSizes.md,
+                fontWeight: typography.fontWeights.heavy,
+                marginTop: 2,
+              }}
+              numberOfLines={1}
+            >
+              {selectedAmount > 0
+                ? `${currency}${selectedAmount.toFixed(2)}`
+                : locale === 'it'
+                  ? 'Nessuna spesa'
+                  : 'No expenses'}
+            </Text>
+          </View>
+
+          {selectedAmount > 0 && (
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => handleFilterLedger(selectedIsoDate)}
+              accessibilityRole="button"
+              accessibilityLabel={locale === 'it' ? 'Filtra nel ledger' : 'Filter ledger'}
+              style={{
+                paddingHorizontal: spacing.sm + 4,
+                paddingVertical: spacing.xs,
+                borderRadius: radius.pill,
+                backgroundColor: theme.colors.brand,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.xs,
+              }}
+            >
+              <Filter size={14} color="#FFFFFF" strokeWidth={2.5} />
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: typography.fontSizes.xs,
+                  fontWeight: typography.fontWeights.bold,
+                }}
+              >
+                {locale === 'it' ? 'Filtra nel ledger' : 'Filter ledger'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            onPress={() => setSelectedDay(null)}
+            accessibilityRole="button"
+            accessibilityLabel={t.common.close}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{
+              padding: spacing.xxs,
+            }}
+          >
+            <X size={18} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Legend */}
       <View
