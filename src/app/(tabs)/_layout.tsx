@@ -33,7 +33,7 @@ function TabsLayoutContent() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const family = useAppStore((s) => s.family);
-  const { labelsVisibility, resetTabScroll } = useTabScroll();
+  const { labelsVisibility, tabBarHeight, resetTabScroll } = useTabScroll();
 
   // Floating dock dimensions — compact centered pill across Android, iOS, and Web
   const { barWidth, barHorizontalOffset, tabSlotWidth } = computeFloatingTabBarMetrics(windowWidth);
@@ -87,13 +87,13 @@ function TabsLayoutContent() {
     const labelLetterSpacing = tabSlotWidth < 78 ? -0.25 : -0.1;
 
     return (
-      <View
+      <Animated.View
         accessibilityLabel={label}
         style={{
           alignItems: 'center',
           justifyContent: 'center',
           width: '100%',
-          height: 56,
+          height: tabBarHeight,
           paddingHorizontal: 1,
         }}
       >
@@ -152,7 +152,7 @@ function TabsLayoutContent() {
         >
           {label}
         </Animated.Text>
-      </View>
+      </Animated.View>
     );
   };
 
@@ -193,7 +193,7 @@ function TabsLayoutContent() {
           end: barHorizontalOffset,
           width: barWidth,
           alignSelf: 'center',
-          height: 64,
+          height: tabBarHeight,
           backgroundColor: 'transparent',
           borderRadius: Radius.dock,
           borderWidth: 1,
@@ -237,7 +237,7 @@ function TabsLayoutContent() {
         ),
         tabBarIconStyle: {
           width: '100%',
-          height: 56,
+          height: '100%',
           justifyContent: 'center',
           alignItems: 'center',
           margin: 0,
@@ -248,7 +248,7 @@ function TabsLayoutContent() {
           minWidth: 0,
           justifyContent: 'center',
           alignItems: 'center',
-          height: 64,
+          height: '100%',
           padding: 0,
           margin: 0,
         },

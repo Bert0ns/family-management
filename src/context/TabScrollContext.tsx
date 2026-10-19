@@ -7,9 +7,12 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import { Animated, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import { Animated, Easing, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 
 export const SCROLL_THRESHOLD = 24;
+export const TAB_BAR_EXPANDED_HEIGHT = 64;
+export const TAB_BAR_COLLAPSED_HEIGHT = 48;
+export const TAB_BAR_ANIMATION_DURATION = 200;
 
 export function shouldShowTabLabels(
   scrollY: number,
@@ -31,6 +34,8 @@ export function computeFloatingTabBarMetrics(windowWidth: number) {
     barWidth,
     barHorizontalOffset,
     tabSlotWidth,
+    expandedHeight: TAB_BAR_EXPANDED_HEIGHT,
+    collapsedHeight: TAB_BAR_COLLAPSED_HEIGHT,
   };
 }
 
@@ -39,15 +44,21 @@ export type TabScrollEvent =
 
 export interface TabScrollContextValue {
   labelsVisibility: Animated.Value;
+  tabBarHeight: Animated.AnimatedInterpolation<number>;
   isAtTop: boolean;
   handleTabScroll: (event: TabScrollEvent) => void;
   resetTabScroll: () => void;
 }
 
 const defaultLabelsVisibility = new Animated.Value(1);
+const defaultTabBarHeight = defaultLabelsVisibility.interpolate({
+  inputRange: [0, 1],
+  outputRange: [TAB_BAR_COLLAPSED_HEIGHT, TAB_BAR_EXPANDED_HEIGHT],
+});
 
 const defaultContextValue: TabScrollContextValue = {
   labelsVisibility: defaultLabelsVisibility,
+  tabBarHeight: defaultTabBarHeight,
   isAtTop: true,
   handleTabScroll: () => {},
   resetTabScroll: () => {},
@@ -59,6 +70,15 @@ export function TabScrollProvider({ children }: { children: ReactNode }) {
   const [labelsVisibility] = useState(() => new Animated.Value(1));
   const [isAtTop, setIsAtTop] = useState(true);
   const isAtTopRef = useRef(true);
+
+  const tabBarHeight = useMemo(
+    () =>
+      labelsVisibility.interpolate({
+        inputRange: [0, 1],
+        outputRange: [TAB_BAR_COLLAPSED_HEIGHT, TAB_BAR_EXPANDED_HEIGHT],
+      }),
+    [labelsVisibility],
+  );
 
   const handleTabScroll = useCallback(
     (event: TabScrollEvent) => {
@@ -72,7 +92,8 @@ export function TabScrollProvider({ children }: { children: ReactNode }) {
         setIsAtTop(true);
         Animated.timing(labelsVisibility, {
           toValue: 1,
-          duration: 180,
+          duration: TAB_BAR_ANIMATION_DURATION,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: false,
         }).start();
       } else if (!atTop && isAtTopRef.current) {
@@ -80,7 +101,8 @@ export function TabScrollProvider({ children }: { children: ReactNode }) {
         setIsAtTop(false);
         Animated.timing(labelsVisibility, {
           toValue: 0,
-          duration: 180,
+          duration: TAB_BAR_ANIMATION_DURATION,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: false,
         }).start();
       }
@@ -93,7 +115,8 @@ export function TabScrollProvider({ children }: { children: ReactNode }) {
     setIsAtTop(true);
     Animated.timing(labelsVisibility, {
       toValue: 1,
-      duration: 180,
+      duration: TAB_BAR_ANIMATION_DURATION,
+      easing: Easing.inOut(Easing.ease),
       useNativeDriver: false,
     }).start();
   }, [labelsVisibility]);
@@ -101,11 +124,12 @@ export function TabScrollProvider({ children }: { children: ReactNode }) {
   const value = useMemo<TabScrollContextValue>(
     () => ({
       labelsVisibility,
+      tabBarHeight,
       isAtTop,
       handleTabScroll,
       resetTabScroll,
     }),
-    [labelsVisibility, isAtTop, handleTabScroll, resetTabScroll],
+    [labelsVisibility, tabBarHeight, isAtTop, handleTabScroll, resetTabScroll],
   );
 
   return <TabScrollContext.Provider value={value}>{children}</TabScrollContext.Provider>;
