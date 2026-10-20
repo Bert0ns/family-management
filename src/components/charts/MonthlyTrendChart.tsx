@@ -330,6 +330,54 @@ export const MonthlyTrendChart: React.FC<MonthlyTrendChartProps> = ({
               </Text>
             </View>
           </View>
+
+          {activePoint.fixedSpend !== undefined && activePoint.fixedSpend > 0 && (
+            <View
+              style={{
+                marginTop: spacing.xs,
+                paddingTop: spacing.xs,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.border,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={{ color: theme.colors.textSecondary, fontSize: 11 }}>
+                  {t.analytics.fixedCosts}:
+                </Text>
+                <Text
+                  style={{
+                    color: theme.colors.brand,
+                    fontSize: 11,
+                    fontWeight: typography.fontWeights.bold,
+                  }}
+                >
+                  {currency}
+                  {activePoint.fixedSpend.toFixed(0)} ({activePoint.fixedPercentage?.toFixed(0)}%)
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={{ color: theme.colors.textSecondary, fontSize: 11 }}>
+                  {t.analytics.variableCosts}:
+                </Text>
+                <Text
+                  style={{
+                    color: theme.colors.textPrimary,
+                    fontSize: 11,
+                    fontWeight: typography.fontWeights.bold,
+                  }}
+                >
+                  {currency}
+                  {(
+                    activePoint.variableSpend ?? activePoint.totalSpend - activePoint.fixedSpend
+                  ).toFixed(0)}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       )}
     </Card>

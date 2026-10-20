@@ -54,6 +54,7 @@ export interface TranslationSchema {
   };
   analytics: {
     categoriesTab: string;
+    recurringTab: string;
     membersTab: string;
     trendsTab: string;
     patternsTab: string;
@@ -108,6 +109,34 @@ export interface TranslationSchema {
     categoryShare: string;
     recentTransactionsInCategory: string;
     noTransactionsInCategory: string;
+    recurringTitle: string;
+    recurringSubtitle: string;
+    fixedVsVariableTitle: string;
+    fixedVsVariableSubtitle: string;
+    fixedCosts: string;
+    variableCosts: string;
+    fixedShare: string;
+    variableShare: string;
+    recurringCountLabel: string;
+    variableCountLabel: string;
+    activeRecurringTitle: string;
+    activeRecurringSubtitle: string;
+    noRecurringData: string;
+    noRecurringHint: string;
+    monthlyAmountLabel: string;
+    cadenceMonthly: string;
+    cadenceYearly: string;
+    cadenceQuarterly: string;
+    cadenceWeekly: string;
+    billedOn: string;
+    viewAllRecurring: string;
+    recurringByCatTitle: string;
+    recurringTag: string;
+    fixedCostBadge: string;
+    variableCostBadge: string;
+    actualBilledLabel: string;
+    monthlyNormalizedTotalLabel: string;
+    billedThisMonthLabel: string;
   };
   ledger: {
     searchPlaceholder: string;
