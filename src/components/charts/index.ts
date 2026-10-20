@@ -6,3 +6,5 @@ export * from './MonthlyTrendChart';
 export * from './DayOfWeekChart';
 export * from './PaymentMethodChart';
 export * from './CategoryDetailModal';
+export * from './FixedVsVariableCard';
+export * from './ActiveRecurringList';

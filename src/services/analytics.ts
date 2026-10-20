@@ -1,4 +1,4 @@
-import { Expense, Category, FamilyMember } from '@/types';
+import { Expense, Category, FamilyMember, RecurringFrequency } from '@/types';
 import {
   IAnalyticsCalculator,
   CategorySummary,
@@ -11,6 +11,9 @@ import {
   DayOfWeekPoint,
   DayKey,
   PaymentMethodSummary,
+  RecurringExpenseItem,
+  RecurringCategoryShare,
+  FixedVsVariableBreakdown,
 } from './interfaces';
 import { toCents, fromCents, sumBy, roundToTwoDecimals } from '@/utils/numberParser';
 
@@ -25,6 +28,10 @@ export {
   DayOfWeekPoint,
   DayKey,
   PaymentMethodSummary,
+  RecurringExpenseItem,
+  RecurringCategoryShare,
+  FixedVsVariableBreakdown,
+  RecurringFrequency,
 };
 
 /**
@@ -55,6 +62,67 @@ export function getHistoricalPeriods(currentPeriod: string, count = 6): string[]
     curr = getPreviousPeriod(curr);
   }
   return periods;
+}
+
+/**
+ * Detects recurring cadence from explicit property or textual context in notes/merchant name.
+ */
+export function detectRecurringFrequency(expense: Expense): RecurringFrequency {
+  if (expense.recurring_frequency) {
+    return expense.recurring_frequency;
+  }
+  const text = `${expense.notes || ''} ${expense.merchant_name || ''}`.toLowerCase();
+  // Match precise recurrence cadence phrases to prevent false positives (e.g. "settimana bianca", "anno accademico")
+  if (
+    /\b(annuale|annuali|all'anno|all anno|per anno|yearly|per year|annual|abbonamento annuale|rinnovo annuale|quota annuale|canone annuale)\b/i.test(
+      text,
+    )
+  ) {
+    return 'yearly';
+  }
+  if (
+    /\b(trimestrale|trimestrali|ogni 3 mesi|ogni tre mesi|quarterly|per quarter|rinnovo trimestrale|quota trimestrale)\b/i.test(
+      text,
+    )
+  ) {
+    return 'quarterly';
+  }
+  if (
+    /\b(settimanale|settimanali|a settimana|alla settimana|per settimana|weekly|per week|quota settimanale|cadenza settimanale)\b/i.test(
+      text,
+    )
+  ) {
+    return 'weekly';
+  }
+  if (
+    /\b(mensile|mensili|al mese|per mese|monthly|per month|abbonamento mensile|rinnovo mensile)\b/i.test(
+      text,
+    )
+  ) {
+    return 'monthly';
+  }
+  return 'monthly';
+}
+
+/**
+ * Normalizes an expense amount to a standard monthly equivalent using cent-exact arithmetic.
+ */
+export function calculateMonthlyNormalizedAmount(
+  amount: number,
+  frequency: RecurringFrequency,
+): number {
+  const amountCents = toCents(amount);
+  switch (frequency) {
+    case 'yearly':
+      return fromCents(Math.round(amountCents / 12));
+    case 'quarterly':
+      return fromCents(Math.round(amountCents / 3));
+    case 'weekly':
+      return fromCents(Math.round((amountCents * 52) / 12));
+    case 'monthly':
+    default:
+      return fromCents(amountCents);
+  }
 }
 
 /**
@@ -281,12 +349,17 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
       'Dec',
     ];
 
-    const periodExpensesMap = new Map<string, { totalCents: number; count: number }>();
+    const periodExpensesMap = new Map<
+      string,
+      { totalCents: number; fixedCents: number; count: number }
+    >();
     expenses.forEach((e) => {
       const p = e.transaction_date.slice(0, 7);
-      const current = periodExpensesMap.get(p) || { totalCents: 0, count: 0 };
+      const current = periodExpensesMap.get(p) || { totalCents: 0, fixedCents: 0, count: 0 };
+      const amountCents = toCents(e.amount);
       periodExpensesMap.set(p, {
-        totalCents: current.totalCents + toCents(e.amount),
+        totalCents: current.totalCents + amountCents,
+        fixedCents: current.fixedCents + (e.is_recurring ? amountCents : 0),
         count: current.count + 1,
       });
     });
@@ -295,19 +368,31 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
       period: string;
       label: string;
       totalSpend: number;
+      fixedSpend: number;
+      variableSpend: number;
+      fixedPercentage: number;
       transactionCount: number;
       totalCents: number;
     }[] = [];
 
     periods.forEach((p) => {
-      const data = periodExpensesMap.get(p) || { totalCents: 0, count: 0 };
+      const data = periodExpensesMap.get(p) || { totalCents: 0, fixedCents: 0, count: 0 };
       const [, monthStr] = p.split('-');
       const monthIdx = parseInt(monthStr, 10) - 1;
       const label = monthNames[monthIdx] || p;
+      const totalSpend = fromCents(data.totalCents);
+      const fixedSpend = fromCents(data.fixedCents);
+      const variableSpend = fromCents(Math.max(0, data.totalCents - data.fixedCents));
+      const fixedPercentage =
+        data.totalCents > 0 ? roundToTwoDecimals((data.fixedCents / data.totalCents) * 100) : 0;
+
       rawPoints.push({
         period: p,
         label,
-        totalSpend: fromCents(data.totalCents),
+        totalSpend,
+        fixedSpend,
+        variableSpend,
+        fixedPercentage,
         transactionCount: data.count,
         totalCents: data.totalCents,
       });
@@ -341,6 +426,9 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
         transactionCount: item.transactionCount,
         momGrowthPercentage,
         rollingAverage,
+        fixedSpend: item.fixedSpend,
+        variableSpend: item.variableSpend,
+        fixedPercentage: item.fixedPercentage,
       };
     });
   }
@@ -440,58 +528,49 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
       }
     });
 
-    const totalCents = sumBy(filtered, (e) => toCents(e.amount));
+    const totalCents = sumBy(Array.from(dayCentsMap.values()), (v) => v.totalCents);
     const totalAmount = fromCents(totalCents);
 
     let weekdayCents = 0;
     let weekendCents = 0;
 
-    const days: DayOfWeekPoint[] = dayConfigs.map((c) => {
-      const data = dayCentsMap.get(c.dayOfWeek)!;
+    const days: DayOfWeekPoint[] = dayConfigs.map((cfg) => {
+      const data = dayCentsMap.get(cfg.dayOfWeek) || { totalCents: 0, count: 0 };
       const amount = fromCents(data.totalCents);
-      const percentage = totalCents > 0 ? (data.totalCents / totalCents) * 100 : 0;
+      const pct = totalCents > 0 ? (data.totalCents / totalCents) * 100 : 0;
       const avg = data.count > 0 ? fromCents(Math.round(data.totalCents / data.count)) : 0;
 
-      if (c.isWeekend) {
+      if (cfg.isWeekend) {
         weekendCents += data.totalCents;
       } else {
         weekdayCents += data.totalCents;
       }
 
       return {
-        dayOfWeek: c.dayOfWeek,
-        dayKey: c.dayKey,
+        dayOfWeek: cfg.dayOfWeek,
+        dayKey: cfg.dayKey,
         totalAmount: amount,
-        percentage: roundToTwoDecimals(percentage),
+        percentage: roundToTwoDecimals(pct),
         transactionCount: data.count,
         averageTransaction: avg,
-        isWeekend: c.isWeekend,
+        isWeekend: cfg.isWeekend,
       };
     });
 
-    const weekdayTotal = fromCents(weekdayCents);
-    const weekendTotal = fromCents(weekendCents);
-    const weekdayPercentage =
-      totalCents > 0 ? roundToTwoDecimals((weekdayCents / totalCents) * 100) : 0;
-    const weekendPercentage =
-      totalCents > 0 ? roundToTwoDecimals((weekendCents / totalCents) * 100) : 0;
-
-    const activeDays = days.filter((d) => d.totalAmount > 0);
     const peakDay =
-      activeDays.length > 0
-        ? activeDays.reduce(
-            (prev, curr) => (curr.totalAmount > prev.totalAmount ? curr : prev),
-            activeDays[0],
-          )
+      days.length > 0
+        ? [...days].sort((a, b) => b.totalAmount - a.totalAmount)[0]?.totalAmount > 0
+          ? [...days].sort((a, b) => b.totalAmount - a.totalAmount)[0]
+          : null
         : null;
 
     return {
       days,
       totalAmount,
-      weekdayTotal,
-      weekendTotal,
-      weekdayPercentage,
-      weekendPercentage,
+      weekdayTotal: fromCents(weekdayCents),
+      weekendTotal: fromCents(weekendCents),
+      weekdayPercentage: totalCents > 0 ? roundToTwoDecimals((weekdayCents / totalCents) * 100) : 0,
+      weekendPercentage: totalCents > 0 ? roundToTwoDecimals((weekendCents / totalCents) * 100) : 0,
       peakDay,
     };
   }
@@ -504,19 +583,19 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
     const totalCents = sumBy(filtered, (e) => toCents(e.amount));
 
     const methodColorMap: Record<string, string> = {
-      CREDIT_CARD: '#415A77',
-      DEBIT_CARD: '#366873',
-      CASH: '#2D6A4F',
-      BANK_TRANSFER: '#52606D',
-      OTHER: '#636B69',
+      CREDIT_CARD: '#4F46E5', // Indigo
+      DEBIT_CARD: '#059669', // Emerald
+      BANK_TRANSFER: '#2563EB', // Blue
+      CASH: '#D97706', // Amber
+      OTHER: '#64748B', // Slate
     };
 
     const methodLabelMap: Record<string, string> = {
       CREDIT_CARD: 'Credit Card',
       DEBIT_CARD: 'Debit Card',
-      CASH: 'Cash',
       BANK_TRANSFER: 'Bank Transfer',
-      OTHER: 'Other / Digital',
+      CASH: 'Cash',
+      OTHER: 'Other',
     };
 
     const methodMap = new Map<string, { totalCents: number; count: number }>();
@@ -554,6 +633,98 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
     });
 
     return summaries.sort((a, b) => b.totalAmount - a.totalAmount);
+  }
+
+  calculateFixedVsVariableBreakdown(
+    expenses: Expense[],
+    categories: Category[],
+    members: FamilyMember[],
+    period: string,
+  ): FixedVsVariableBreakdown {
+    const periodExpenses = expenses.filter((e) => e.transaction_date.startsWith(period));
+    const totalCents = sumBy(periodExpenses, (e) => toCents(e.amount));
+    const totalSpend = fromCents(totalCents);
+
+    const recurringExpenses = periodExpenses.filter((e) => Boolean(e.is_recurring));
+    const variableExpenses = periodExpenses.filter((e) => !e.is_recurring);
+
+    const fixedCents = sumBy(recurringExpenses, (e) => toCents(e.amount));
+    const fixedSpend = fromCents(fixedCents);
+    const variableSpend = fromCents(Math.max(0, totalCents - fixedCents));
+
+    const fixedPercentage =
+      totalCents > 0 ? roundToTwoDecimals((fixedCents / totalCents) * 100) : 0;
+    const variablePercentage =
+      totalCents > 0 ? roundToTwoDecimals(((totalCents - fixedCents) / totalCents) * 100) : 0;
+
+    const recurringItems: RecurringExpenseItem[] = recurringExpenses
+      .map((expense) => {
+        const frequency = detectRecurringFrequency(expense);
+        const monthlyAmount = calculateMonthlyNormalizedAmount(expense.amount, frequency);
+        const category = categories.find((c) => c.id === expense.category_id);
+        const payer = members.find((m) => m.id === expense.paid_by_member_id);
+
+        return {
+          expense,
+          frequency,
+          monthlyAmount,
+          category,
+          payer,
+        };
+      })
+      .sort((a, b) => b.expense.amount - a.expense.amount);
+
+    const monthlyNormalizedFixedSpendCents = recurringItems.reduce(
+      (acc, item) => acc + toCents(item.monthlyAmount),
+      0,
+    );
+    const monthlyNormalizedFixedSpend = fromCents(monthlyNormalizedFixedSpendCents);
+
+    // Fixed breakdown by category
+    const catCentsMap = new Map<string, { totalCents: number; count: number }>();
+    recurringExpenses.forEach((e) => {
+      const cur = catCentsMap.get(e.category_id) || { totalCents: 0, count: 0 };
+      catCentsMap.set(e.category_id, {
+        totalCents: cur.totalCents + toCents(e.amount),
+        count: cur.count + 1,
+      });
+    });
+
+    const categoryBreakdown: RecurringCategoryShare[] = [];
+    catCentsMap.forEach((data, catId) => {
+      const cat = categories.find((c) => c.id === catId) || {
+        id: catId,
+        family_id: '',
+        name: 'Uncategorized',
+        icon: 'Tag',
+        color: '#94A3B8',
+      };
+      const catTotal = fromCents(data.totalCents);
+      const percentage =
+        fixedCents > 0 ? roundToTwoDecimals((data.totalCents / fixedCents) * 100) : 0;
+      categoryBreakdown.push({
+        category: cat,
+        total: catTotal,
+        percentage,
+        count: data.count,
+      });
+    });
+
+    categoryBreakdown.sort((a, b) => b.total - a.total);
+
+    return {
+      period,
+      totalSpend,
+      fixedSpend,
+      variableSpend,
+      fixedPercentage,
+      variablePercentage,
+      recurringCount: recurringExpenses.length,
+      variableCount: variableExpenses.length,
+      monthlyNormalizedFixedSpend,
+      recurringItems,
+      categoryBreakdown,
+    };
   }
 }
 
@@ -596,3 +767,10 @@ export const calculateDayOfWeekDistribution = (expenses: Expense[], period?: str
 
 export const calculatePaymentMethodDistribution = (expenses: Expense[], period?: string) =>
   analyticsCalculator.calculatePaymentMethodDistribution(expenses, period);
+
+export const calculateFixedVsVariableBreakdown = (
+  expenses: Expense[],
+  categories: Category[],
+  members: FamilyMember[],
+  period: string,
+) => analyticsCalculator.calculateFixedVsVariableBreakdown(expenses, categories, members, period);

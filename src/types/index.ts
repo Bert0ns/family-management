@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export type UserRole = 'ADMIN' | 'MEMBER' | 'VIEWER';
 export type SupportedCurrency = '€' | 'EUR';
+export type RecurringFrequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';
 export type MutationOperation = 'INSERT' | 'UPDATE' | 'DELETE';
@@ -71,6 +72,7 @@ export interface Expense {
   notes?: string;
   payment_method?: string;
   is_recurring?: boolean;
+  recurring_frequency?: RecurringFrequency;
   is_verified?: boolean;
   created_at: string;
   updated_at?: string;
@@ -109,6 +111,7 @@ export const ExpenseItemSchema = z.object({
   paid_by: z.string().trim().max(100).optional(),
   payment_method: z.string().trim().max(50).optional(),
   is_recurring: z.boolean().default(false),
+  recurring_frequency: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']).optional(),
 });
 
 export const ExpenseReportImportSchema = z.object({

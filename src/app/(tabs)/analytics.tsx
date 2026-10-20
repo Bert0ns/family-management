@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { PieChart, Users, TrendingUp, Activity, Calendar } from 'lucide-react-native';
+import { PieChart, Users, TrendingUp, Activity, Calendar, Repeat } from 'lucide-react-native';
 import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n } from '@/i18n';
 import { useAppStore } from '@/services/store';
@@ -13,6 +13,7 @@ import {
   calculateComparativeSpendingVelocity,
   calculateDayOfWeekDistribution,
   calculatePaymentMethodDistribution,
+  calculateFixedVsVariableBreakdown,
 } from '@/services/analytics';
 import { Card } from '@/components/common/Card';
 import { PeriodSelector } from '@/components/common/PeriodSelector';
@@ -24,6 +25,8 @@ import { MonthlyTrendChart } from '@/components/charts/MonthlyTrendChart';
 import { DayOfWeekChart } from '@/components/charts/DayOfWeekChart';
 import { PaymentMethodChart } from '@/components/charts/PaymentMethodChart';
 import { CategoryDetailModal } from '@/components/charts/CategoryDetailModal';
+import { FixedVsVariableCard } from '@/components/charts/FixedVsVariableCard';
+import { ActiveRecurringList } from '@/components/charts/ActiveRecurringList';
 import { useTabScroll } from '@/context/TabScrollContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -40,7 +43,7 @@ export default function AnalyticsScreen() {
   const setSelectedPeriod = useAppStore((s) => s.setSelectedPeriod);
 
   const [activeTab, setActiveTab] = useState<
-    'categories' | 'members' | 'trends' | 'patterns' | 'heatmap'
+    'categories' | 'recurring' | 'members' | 'trends' | 'patterns' | 'heatmap'
   >('categories');
 
   const [selectedCategory, setSelectedCategory] = useState<CategorySummary | null>(null);
@@ -53,6 +56,11 @@ export default function AnalyticsScreen() {
   const categoryBreakdown = useMemo(
     () => calculateCategoryBreakdown(periodExpenses, categories),
     [periodExpenses, categories],
+  );
+
+  const fixedVsVariableBreakdown = useMemo(
+    () => calculateFixedVsVariableBreakdown(periodExpenses, categories, members, selectedPeriod),
+    [periodExpenses, categories, members, selectedPeriod],
   );
 
   const memberContributions = useMemo(
@@ -129,6 +137,7 @@ export default function AnalyticsScreen() {
       >
         {[
           { id: 'categories' as const, label: t.analytics.categoriesTab, icon: PieChart },
+          { id: 'recurring' as const, label: t.analytics.recurringTab, icon: Repeat },
           { id: 'members' as const, label: t.analytics.membersTab, icon: Users },
           { id: 'trends' as const, label: t.analytics.trendsTab, icon: TrendingUp },
           { id: 'patterns' as const, label: t.analytics.patternsTab, icon: Activity },
@@ -186,6 +195,12 @@ export default function AnalyticsScreen() {
       {/* Tab Panels */}
       {activeTab === 'categories' && (
         <View style={{ gap: spacing.lg }}>
+          <FixedVsVariableCard
+            data={fixedVsVariableBreakdown}
+            currency={family.currency}
+            onViewDetails={() => setActiveTab('recurring')}
+          />
+
           <CategoryPieChart
             data={categoryBreakdown}
             currency={family.currency}
@@ -307,6 +322,13 @@ export default function AnalyticsScreen() {
               </View>
             )}
           </Card>
+        </View>
+      )}
+
+      {activeTab === 'recurring' && (
+        <View style={{ gap: spacing.lg }}>
+          <FixedVsVariableCard data={fixedVsVariableBreakdown} currency={family.currency} />
+          <ActiveRecurringList breakdown={fixedVsVariableBreakdown} currency={family.currency} />
         </View>
       )}
 
