@@ -72,55 +72,77 @@ export function detectRecurringFrequency(expense: Expense): RecurringFrequency {
     return expense.recurring_frequency;
   }
   const text = `${expense.notes || ''} ${expense.merchant_name || ''}`.toLowerCase();
-  if (/annu|yearly|annual|anno/i.test(text)) {
+  // Match precise recurrence cadence phrases to prevent false positives (e.g. "settimana bianca", "anno accademico")
+  if (
+    /\b(annuale|annuali|all'anno|all anno|per anno|yearly|per year|annual|abbonamento annuale|rinnovo annuale|quota annuale|canone annuale)\b/i.test(
+      text,
+    )
+  ) {
     return 'yearly';
   }
-  if (/quarter|trimestr/i.test(text)) {
+  if (
+    /\b(trimestrale|trimestrali|ogni 3 mesi|ogni tre mesi|quarterly|per quarter|rinnovo trimestrale|quota trimestrale)\b/i.test(
+      text,
+    )
+  ) {
     return 'quarterly';
   }
-  if (/week|settiman/i.test(text)) {
+  if (
+    /\b(settimanale|settimanali|a settimana|alla settimana|per settimana|weekly|per week|quota settimanale|cadenza settimanale)\b/i.test(
+      text,
+    )
+  ) {
     return 'weekly';
+  }
+  if (
+    /\b(mensile|mensili|al mese|per mese|monthly|per month|abbonamento mensile|rinnovo mensile)\b/i.test(
+      text,
+    )
+  ) {
+    return 'monthly';
   }
   return 'monthly';
 }
 
 /**
- * Normalizes an expense amount to a standard monthly equivalent.
+ * Normalizes an expense amount to a standard monthly equivalent using cent-exact arithmetic.
  */
 export function calculateMonthlyNormalizedAmount(
   amount: number,
   frequency: RecurringFrequency,
 ): number {
+  const amountCents = toCents(amount);
   switch (frequency) {
     case 'yearly':
-      return roundToTwoDecimals(amount / 12);
+      return fromCents(Math.round(amountCents / 12));
     case 'quarterly':
-      return roundToTwoDecimals(amount / 3);
+      return fromCents(Math.round(amountCents / 3));
     case 'weekly':
-      return roundToTwoDecimals((amount * 52) / 12);
+      return fromCents(Math.round((amountCents * 52) / 12));
     case 'monthly':
     default:
-      return roundToTwoDecimals(amount);
+      return fromCents(amountCents);
   }
 }
 
 /**
- * Normalizes an expense amount to an annualized equivalent.
+ * Normalizes an expense amount to an annualized equivalent using cent-exact arithmetic.
  */
 export function calculateAnnualNormalizedAmount(
   amount: number,
   frequency: RecurringFrequency,
 ): number {
+  const amountCents = toCents(amount);
   switch (frequency) {
     case 'yearly':
-      return roundToTwoDecimals(amount);
+      return fromCents(amountCents);
     case 'quarterly':
-      return roundToTwoDecimals(amount * 4);
+      return fromCents(amountCents * 4);
     case 'weekly':
-      return roundToTwoDecimals(amount * 52);
+      return fromCents(amountCents * 52);
     case 'monthly':
     default:
-      return roundToTwoDecimals(amount * 12);
+      return fromCents(amountCents * 12);
   }
 }
 
@@ -675,9 +697,17 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
       })
       .sort((a, b) => b.expense.amount - a.expense.amount);
 
-    const annualizedFixedSpend = roundToTwoDecimals(
-      recurringItems.reduce((acc, item) => acc + item.annualAmount, 0),
+    const annualizedFixedSpendCents = recurringItems.reduce(
+      (acc, item) => acc + toCents(item.annualAmount),
+      0,
     );
+    const annualizedFixedSpend = fromCents(annualizedFixedSpendCents);
+
+    const monthlyNormalizedFixedSpendCents = recurringItems.reduce(
+      (acc, item) => acc + toCents(item.monthlyAmount),
+      0,
+    );
+    const monthlyNormalizedFixedSpend = fromCents(monthlyNormalizedFixedSpendCents);
 
     // Fixed breakdown by category
     const catCentsMap = new Map<string, { totalCents: number; count: number }>();
@@ -721,6 +751,7 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
       recurringCount: recurringExpenses.length,
       variableCount: variableExpenses.length,
       annualizedFixedSpend,
+      monthlyNormalizedFixedSpend,
       recurringItems,
       categoryBreakdown,
     };

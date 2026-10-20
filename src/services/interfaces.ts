@@ -121,6 +121,7 @@ export interface FixedVsVariableBreakdown {
   recurringCount: number;
   variableCount: number;
   annualizedFixedSpend: number;
+  monthlyNormalizedFixedSpend: number;
   recurringItems: RecurringExpenseItem[];
   categoryBreakdown: RecurringCategoryShare[];
 }

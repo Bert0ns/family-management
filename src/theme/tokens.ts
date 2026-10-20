@@ -1,3 +1,5 @@
+import { Platform, type TextStyle } from 'react-native';
+
 export const Palette = {
   emerald: {
     50: '#ECFDF5',
@@ -353,3 +355,8 @@ export const MemberColors = [
   { name: 'Moss', bg: '#476E54', light: '#E9EFEA' },
   { name: 'Teal', bg: '#366873', light: '#E6ECEE' },
 ];
+
+export const TABULAR_NUMS: TextStyle =
+  Platform.OS === 'web'
+    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
+    : { fontVariant: ['tabular-nums'] };

@@ -193,16 +193,60 @@ describe('Issue #69 Recurring Expenses & Subscriptions Analytics', () => {
       expect(detectRecurringFrequency(fallbackMonthly)).toBe('monthly');
     });
 
-    it('correctly normalizes monthly amounts for different cadences', () => {
+    it('resists false positives on phrases like "settimana bianca" and "anno accademico"', () => {
+      // "settimana bianca" should NOT be classified as weekly
+      const vacationExpense: Expense = {
+        id: 'fp1',
+        family_id: 'fam_1',
+        paid_by_member_id: 'mem_1',
+        category_id: 'cat_subs',
+        transaction_date: '2026-10-01',
+        merchant_name: 'Hotel Dolomiti',
+        notes: 'Caparra settimana bianca in montagna',
+        amount: 300,
+        payment_method: 'BANK_TRANSFER',
+        created_at: '2026-10-01',
+        is_recurring: true,
+      };
+      expect(detectRecurringFrequency(vacationExpense)).toBe('monthly');
+
+      // "anno accademico" should NOT be classified as yearly
+      const universityExpense: Expense = {
+        id: 'fp2',
+        family_id: 'fam_1',
+        paid_by_member_id: 'mem_2',
+        category_id: 'cat_subs',
+        transaction_date: '2026-10-01',
+        merchant_name: 'Universita',
+        notes: 'Iscrizione anno accademico 2026',
+        amount: 500,
+        payment_method: 'BANK_TRANSFER',
+        created_at: '2026-10-01',
+        is_recurring: true,
+      };
+      expect(detectRecurringFrequency(universityExpense)).toBe('monthly');
+
+      // Explicit flag always overrides text
+      const explicitWins: Expense = {
+        ...vacationExpense,
+        recurring_frequency: 'yearly',
+      };
+      expect(detectRecurringFrequency(explicitWins)).toBe('yearly');
+    });
+
+    it('correctly normalizes monthly amounts using cent-exact arithmetic without float drift', () => {
       // Monthly: amount directly
       expect(calculateMonthlyNormalizedAmount(50, 'monthly')).toBe(50);
-      // Yearly: amount / 12
+      // Yearly: amount in cents / 12
       expect(calculateMonthlyNormalizedAmount(120, 'yearly')).toBe(10);
-      expect(calculateMonthlyNormalizedAmount(49.99, 'yearly')).toBeCloseTo(4.17, 2);
-      // Quarterly: amount / 3
+      expect(calculateMonthlyNormalizedAmount(49.99, 'yearly')).toBe(4.17); // 4999 / 12 = 416.58 -> 417 cents = 4.17
+      expect(calculateMonthlyNormalizedAmount(100.05, 'yearly')).toBe(8.34);
+      // Quarterly: amount in cents / 3
       expect(calculateMonthlyNormalizedAmount(90, 'quarterly')).toBe(30);
-      // Weekly: (amount * 52) / 12
-      expect(calculateMonthlyNormalizedAmount(100, 'weekly')).toBeCloseTo(433.33, 2);
+      expect(calculateMonthlyNormalizedAmount(100, 'quarterly')).toBe(33.33);
+      // Weekly: (amount in cents * 52) / 12
+      expect(calculateMonthlyNormalizedAmount(100, 'weekly')).toBe(433.33);
+      expect(calculateMonthlyNormalizedAmount(10.01, 'weekly')).toBe(43.38); // 1001 * 52 / 12 = 4337.66 -> 4338 cents = 43.38
     });
 
     it('correctly calculates annualized spend projections', () => {
@@ -327,6 +371,11 @@ describe('Issue #69 Recurring Expenses & Subscriptions Analytics', () => {
       expect(primeItem?.annualAmount).toBe(48.0);
       expect(primeItem?.payer?.display_name).toBe('Bob');
 
+      // Monthly normalized fixed spend (Netflix: 15.99 + Prime: 4.00 = 19.99)
+      expect(breakdown.monthlyNormalizedFixedSpend).toBe(19.99);
+      // Annualized fixed spend cents sum (Netflix: 191.88 + Prime: 48.00 = 239.88)
+      expect(breakdown.annualizedFixedSpend).toBe(239.88);
+
       // Category breakdown for recurring
       expect(breakdown.categoryBreakdown).toHaveLength(1);
       expect(breakdown.categoryBreakdown[0].category.id).toBe('cat_subs');
@@ -435,6 +484,9 @@ describe('Issue #69 Recurring Expenses & Subscriptions Analytics', () => {
         'recurringTag',
         'fixedCostBadge',
         'variableCostBadge',
+        'actualBilledLabel',
+        'monthlyNormalizedTotalLabel',
+        'billedThisMonthLabel',
       ] as const;
 
       for (const key of requiredKeys) {

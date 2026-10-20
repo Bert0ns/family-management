@@ -135,6 +135,9 @@ export interface TranslationSchema {
     recurringTag: string;
     fixedCostBadge: string;
     variableCostBadge: string;
+    actualBilledLabel: string;
+    monthlyNormalizedTotalLabel: string;
+    billedThisMonthLabel: string;
   };
   ledger: {
     searchPlaceholder: string;

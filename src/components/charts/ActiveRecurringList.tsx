@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Platform, type TextStyle } from 'react-native';
-import { useTheme } from '@/theme';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n, getLocalizedCategoryName } from '@/i18n';
 import { Expense, RecurringFrequency } from '@/types';
 import { FixedVsVariableBreakdown } from '@/services/interfaces';
@@ -13,11 +13,6 @@ interface ActiveRecurringListProps {
   currency?: string;
   onSelectExpense?: (expense: Expense) => void;
 }
-
-const TABULAR_NUMS: TextStyle =
-  Platform.OS === 'web'
-    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
-    : { fontVariant: ['tabular-nums'] };
 
 export const ActiveRecurringList: React.FC<ActiveRecurringListProps> = ({
   breakdown,
@@ -121,6 +116,48 @@ export const ActiveRecurringList: React.FC<ActiveRecurringListProps> = ({
             }}
           >
             {t.analytics.activeRecurringSubtitle}
+          </Text>
+        </View>
+
+        {/* Transparency summary banner */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: theme.colors.surfaceSubtle,
+            paddingHorizontal: spacing.sm,
+            paddingVertical: spacing.xs,
+            borderRadius: radius.xs,
+            marginBottom: spacing.md,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          }}
+        >
+          <Text style={{ color: theme.colors.textSecondary, fontSize: 11 }}>
+            {t.analytics.billedThisMonthLabel}:{' '}
+            <Text
+              style={[
+                { color: theme.colors.textPrimary, fontWeight: typography.fontWeights.bold },
+                TABULAR_NUMS,
+              ]}
+            >
+              {currency}
+              {breakdown.fixedSpend.toFixed(2)}
+            </Text>
+          </Text>
+          <Text style={{ color: theme.colors.textSecondary, fontSize: 11 }}>
+            {t.analytics.monthlyNormalizedTotalLabel}:{' '}
+            <Text
+              style={[
+                { color: theme.colors.brand, fontWeight: typography.fontWeights.bold },
+                TABULAR_NUMS,
+              ]}
+            >
+              {currency}
+              {breakdown.monthlyNormalizedFixedSpend.toFixed(2)}/
+              {t.analytics.cadenceMonthly.toLowerCase()}
+            </Text>
           </Text>
         </View>
 
@@ -269,21 +306,20 @@ export const ActiveRecurringList: React.FC<ActiveRecurringListProps> = ({
                   >
                     {t.analytics.monthlyAmountLabel}
                   </Text>
-                  {item.frequency !== 'monthly' && (
-                    <Text
-                      style={[
-                        {
-                          color: theme.colors.textSecondary,
-                          fontSize: 10,
-                          marginTop: 1,
-                        },
-                        TABULAR_NUMS,
-                      ]}
-                    >
-                      ({currency}
-                      {expense.amount.toFixed(2)})
-                    </Text>
-                  )}
+                  <Text
+                    style={[
+                      {
+                        color: theme.colors.textSecondary,
+                        fontSize: 10,
+                        marginTop: 1,
+                      },
+                      TABULAR_NUMS,
+                    ]}
+                  >
+                    {item.frequency === 'monthly'
+                      ? t.analytics.billedThisMonthLabel
+                      : `${t.analytics.actualBilledLabel}: ${currency}${expense.amount.toFixed(2)}`}
+                  </Text>
                 </View>
               </TouchableOpacity>
             );

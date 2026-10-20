@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Platform, type TextStyle } from 'react-native';
-import { useTheme } from '@/theme';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n } from '@/i18n';
 import { FixedVsVariableBreakdown } from '@/services/interfaces';
 import { Card } from '@/components/common/Card';
@@ -11,11 +11,6 @@ interface FixedVsVariableCardProps {
   currency?: string;
   onViewDetails?: () => void;
 }
-
-const TABULAR_NUMS: TextStyle =
-  Platform.OS === 'web'
-    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
-    : { fontVariant: ['tabular-nums'] };
 
 export const FixedVsVariableCard: React.FC<FixedVsVariableCardProps> = ({
   data,
@@ -233,7 +228,8 @@ export const FixedVsVariableCard: React.FC<FixedVsVariableCardProps> = ({
               marginTop: 2,
             }}
           >
-            {data.recurringCount} {t.analytics.recurringCountLabel}
+            {data.recurringCount} {t.analytics.recurringCountLabel} •{' '}
+            {t.analytics.billedThisMonthLabel}
           </Text>
         </View>
 
@@ -340,19 +336,36 @@ export const FixedVsVariableCard: React.FC<FixedVsVariableCardProps> = ({
               {t.analytics.annualProjectionLabel}
             </Text>
           </View>
-          <Text
-            style={[
-              {
-                color: theme.colors.textPrimary,
-                fontSize: typography.fontSizes.sm,
-                fontWeight: typography.fontWeights.heavy,
-              },
-              TABULAR_NUMS,
-            ]}
-          >
-            {currency}
-            {data.annualizedFixedSpend.toFixed(2)}/anno
-          </Text>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text
+              style={[
+                {
+                  color: theme.colors.textPrimary,
+                  fontSize: typography.fontSizes.sm,
+                  fontWeight: typography.fontWeights.heavy,
+                },
+                TABULAR_NUMS,
+              ]}
+            >
+              {currency}
+              {data.annualizedFixedSpend.toFixed(2)}/anno
+            </Text>
+            {data.monthlyNormalizedFixedSpend !== data.fixedSpend && (
+              <Text
+                style={[
+                  {
+                    color: theme.colors.textSecondary,
+                    fontSize: 10,
+                  },
+                  TABULAR_NUMS,
+                ]}
+              >
+                {t.analytics.monthlyNormalizedTotalLabel}: {currency}
+                {data.monthlyNormalizedFixedSpend.toFixed(2)}/
+                {t.analytics.cadenceMonthly.toLowerCase()}
+              </Text>
+            )}
+          </View>
         </View>
       )}
     </Card>

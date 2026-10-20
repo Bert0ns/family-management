@@ -137,6 +137,9 @@ export const en: TranslationSchema = {
     recurringTag: 'Recurring',
     fixedCostBadge: 'Fixed',
     variableCostBadge: 'Variable',
+    actualBilledLabel: 'Actual billed',
+    monthlyNormalizedTotalLabel: 'Monthly normalized',
+    billedThisMonthLabel: 'Billed this month',
   },
   ledger: {
     searchPlaceholder: 'Search merchants, notes...',

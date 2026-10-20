@@ -137,6 +137,9 @@ export const it: TranslationSchema = {
     recurringTag: 'Ricorrente',
     fixedCostBadge: 'Fisso',
     variableCostBadge: 'Variabile',
+    actualBilledLabel: 'Addebito reale',
+    monthlyNormalizedTotalLabel: 'Impegno mensilizzato',
+    billedThisMonthLabel: 'Addebitato questo mese',
   },
   ledger: {
     searchPlaceholder: 'Cerca commercianti, note...',
