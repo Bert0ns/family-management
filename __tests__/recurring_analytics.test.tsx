@@ -1,7 +1,6 @@
 import {
   detectRecurringFrequency,
   calculateMonthlyNormalizedAmount,
-  calculateAnnualNormalizedAmount,
   calculateFixedVsVariableBreakdown,
   calculateHistoricalMonthlyTrends,
 } from '@/services/analytics';
@@ -248,13 +247,6 @@ describe('Issue #69 Recurring Expenses & Subscriptions Analytics', () => {
       expect(calculateMonthlyNormalizedAmount(100, 'weekly')).toBe(433.33);
       expect(calculateMonthlyNormalizedAmount(10.01, 'weekly')).toBe(43.38); // 1001 * 52 / 12 = 4337.66 -> 4338 cents = 43.38
     });
-
-    it('correctly calculates annualized spend projections', () => {
-      expect(calculateAnnualNormalizedAmount(50, 'monthly')).toBe(600);
-      expect(calculateAnnualNormalizedAmount(120, 'yearly')).toBe(120);
-      expect(calculateAnnualNormalizedAmount(90, 'quarterly')).toBe(360);
-      expect(calculateAnnualNormalizedAmount(10, 'weekly')).toBe(520);
-    });
   });
 
   describe('calculateFixedVsVariableBreakdown Calculation Engine', () => {
@@ -273,7 +265,6 @@ describe('Issue #69 Recurring Expenses & Subscriptions Analytics', () => {
       expect(breakdown.variablePercentage).toBe(0);
       expect(breakdown.recurringCount).toBe(0);
       expect(breakdown.variableCount).toBe(0);
-      expect(breakdown.annualizedFixedSpend).toBe(0);
       expect(breakdown.recurringItems).toEqual([]);
       expect(breakdown.categoryBreakdown).toEqual([]);
     });
@@ -348,6 +339,8 @@ describe('Issue #69 Recurring Expenses & Subscriptions Analytics', () => {
       expect(breakdown.variableSpend).toBe(170.5);
       // Total = 234.49
       expect(breakdown.totalSpend).toBe(234.49);
+      // Strictly reconciles: fixedSpend + variableSpend === totalSpend
+      expect(breakdown.fixedSpend + breakdown.variableSpend).toBe(breakdown.totalSpend);
 
       // Percentages sum to 100%
       expect(breakdown.fixedPercentage + breakdown.variablePercentage).toBeCloseTo(100, 1);
@@ -362,19 +355,15 @@ describe('Issue #69 Recurring Expenses & Subscriptions Analytics', () => {
       const netflixItem = breakdown.recurringItems.find((i) => i.expense.id === 'exp_1');
       expect(netflixItem).toBeDefined();
       expect(netflixItem?.monthlyAmount).toBe(15.99);
-      expect(netflixItem?.annualAmount).toBe(15.99 * 12);
       expect(netflixItem?.payer?.display_name).toBe('Alice');
 
       const primeItem = breakdown.recurringItems.find((i) => i.expense.id === 'exp_2');
       expect(primeItem).toBeDefined();
       expect(primeItem?.monthlyAmount).toBe(4.0); // 48 / 12
-      expect(primeItem?.annualAmount).toBe(48.0);
       expect(primeItem?.payer?.display_name).toBe('Bob');
 
       // Monthly normalized fixed spend (Netflix: 15.99 + Prime: 4.00 = 19.99)
       expect(breakdown.monthlyNormalizedFixedSpend).toBe(19.99);
-      // Annualized fixed spend cents sum (Netflix: 191.88 + Prime: 48.00 = 239.88)
-      expect(breakdown.annualizedFixedSpend).toBe(239.88);
 
       // Category breakdown for recurring
       expect(breakdown.categoryBreakdown).toHaveLength(1);
@@ -473,7 +462,6 @@ describe('Issue #69 Recurring Expenses & Subscriptions Analytics', () => {
         'noRecurringData',
         'noRecurringHint',
         'monthlyAmountLabel',
-        'annualProjectionLabel',
         'cadenceMonthly',
         'cadenceYearly',
         'cadenceQuarterly',

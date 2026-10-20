@@ -126,27 +126,6 @@ export function calculateMonthlyNormalizedAmount(
 }
 
 /**
- * Normalizes an expense amount to an annualized equivalent using cent-exact arithmetic.
- */
-export function calculateAnnualNormalizedAmount(
-  amount: number,
-  frequency: RecurringFrequency,
-): number {
-  const amountCents = toCents(amount);
-  switch (frequency) {
-    case 'yearly':
-      return fromCents(amountCents);
-    case 'quarterly':
-      return fromCents(amountCents * 4);
-    case 'weekly':
-      return fromCents(amountCents * 52);
-    case 'monthly':
-    default:
-      return fromCents(amountCents * 12);
-  }
-}
-
-/**
  * AnalyticsCalculator implements IAnalyticsCalculator following the Single Responsibility Principle.
  */
 export class AnalyticsCalculator implements IAnalyticsCalculator {
@@ -682,7 +661,6 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
       .map((expense) => {
         const frequency = detectRecurringFrequency(expense);
         const monthlyAmount = calculateMonthlyNormalizedAmount(expense.amount, frequency);
-        const annualAmount = calculateAnnualNormalizedAmount(expense.amount, frequency);
         const category = categories.find((c) => c.id === expense.category_id);
         const payer = members.find((m) => m.id === expense.paid_by_member_id);
 
@@ -690,18 +668,11 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
           expense,
           frequency,
           monthlyAmount,
-          annualAmount,
           category,
           payer,
         };
       })
       .sort((a, b) => b.expense.amount - a.expense.amount);
-
-    const annualizedFixedSpendCents = recurringItems.reduce(
-      (acc, item) => acc + toCents(item.annualAmount),
-      0,
-    );
-    const annualizedFixedSpend = fromCents(annualizedFixedSpendCents);
 
     const monthlyNormalizedFixedSpendCents = recurringItems.reduce(
       (acc, item) => acc + toCents(item.monthlyAmount),
@@ -750,7 +721,6 @@ export class AnalyticsCalculator implements IAnalyticsCalculator {
       variablePercentage,
       recurringCount: recurringExpenses.length,
       variableCount: variableExpenses.length,
-      annualizedFixedSpend,
       monthlyNormalizedFixedSpend,
       recurringItems,
       categoryBreakdown,

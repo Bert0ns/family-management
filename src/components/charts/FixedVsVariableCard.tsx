@@ -4,7 +4,7 @@ import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n } from '@/i18n';
 import { FixedVsVariableBreakdown } from '@/services/interfaces';
 import { Card } from '@/components/common/Card';
-import { Repeat, ChevronRight, CheckCircle2, ShoppingBag } from 'lucide-react-native';
+import { Repeat, ChevronRight, ShoppingBag } from 'lucide-react-native';
 
 interface FixedVsVariableCardProps {
   data: FixedVsVariableBreakdown;
@@ -309,65 +309,6 @@ export const FixedVsVariableCard: React.FC<FixedVsVariableCardProps> = ({
           </Text>
         </View>
       </View>
-
-      {/* Annualized Fixed Spend Projection */}
-      {data.recurringCount > 0 && (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: theme.colors.surfaceSubtle,
-            paddingHorizontal: spacing.md,
-            paddingVertical: spacing.sm,
-            borderRadius: radius.sm,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <CheckCircle2 size={14} color={fixedColor} />
-            <Text
-              style={{
-                color: theme.colors.textSecondary,
-                fontSize: typography.fontSizes.xs,
-              }}
-            >
-              {t.analytics.annualProjectionLabel}
-            </Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text
-              style={[
-                {
-                  color: theme.colors.textPrimary,
-                  fontSize: typography.fontSizes.sm,
-                  fontWeight: typography.fontWeights.heavy,
-                },
-                TABULAR_NUMS,
-              ]}
-            >
-              {currency}
-              {data.annualizedFixedSpend.toFixed(2)}/anno
-            </Text>
-            {data.monthlyNormalizedFixedSpend !== data.fixedSpend && (
-              <Text
-                style={[
-                  {
-                    color: theme.colors.textSecondary,
-                    fontSize: 10,
-                  },
-                  TABULAR_NUMS,
-                ]}
-              >
-                {t.analytics.monthlyNormalizedTotalLabel}: {currency}
-                {data.monthlyNormalizedFixedSpend.toFixed(2)}/
-                {t.analytics.cadenceMonthly.toLowerCase()}
-              </Text>
-            )}
-          </View>
-        </View>
-      )}
     </Card>
   );
 };

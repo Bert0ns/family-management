@@ -124,7 +124,6 @@ export interface TranslationSchema {
     noRecurringData: string;
     noRecurringHint: string;
     monthlyAmountLabel: string;
-    annualProjectionLabel: string;
     cadenceMonthly: string;
     cadenceYearly: string;
     cadenceQuarterly: string;

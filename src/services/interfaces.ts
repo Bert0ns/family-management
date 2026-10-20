@@ -99,7 +99,6 @@ export interface RecurringExpenseItem {
   expense: Expense;
   frequency: RecurringFrequency;
   monthlyAmount: number;
-  annualAmount: number;
   category?: Category;
   payer?: FamilyMember;
 }
@@ -120,7 +119,6 @@ export interface FixedVsVariableBreakdown {
   variablePercentage: number;
   recurringCount: number;
   variableCount: number;
-  annualizedFixedSpend: number;
   monthlyNormalizedFixedSpend: number;
   recurringItems: RecurringExpenseItem[];
   categoryBreakdown: RecurringCategoryShare[];

@@ -126,7 +126,6 @@ export const en: TranslationSchema = {
     noRecurringData: 'No recurring expenses or subscriptions recorded for this month',
     noRecurringHint: 'Expenses marked as recurring will be analyzed here',
     monthlyAmountLabel: 'Per month',
-    annualProjectionLabel: 'Annualized',
     cadenceMonthly: 'Monthly',
     cadenceYearly: 'Yearly',
     cadenceQuarterly: 'Quarterly',

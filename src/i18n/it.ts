@@ -126,7 +126,6 @@ export const it: TranslationSchema = {
     noRecurringData: 'Nessuna spesa ricorrente o abbonamento registrato per questo mese',
     noRecurringHint: 'Le spese contrassegnate come ricorrenti verranno analizzate qui',
     monthlyAmountLabel: 'Al mese',
-    annualProjectionLabel: 'Stima annua',
     cadenceMonthly: 'Mensile',
     cadenceYearly: 'Annuale',
     cadenceQuarterly: 'Trimestrale',
