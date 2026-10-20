@@ -9,6 +9,7 @@ import {
   formatPeriodLabel,
   getAdjacentPeriod,
   formatIsoDate,
+  parseIsoDate,
 } from '@/utils/date';
 
 describe('Date Utilities & Formatters', () => {
@@ -111,6 +112,52 @@ describe('Date Utilities & Formatters', () => {
       const enDate = formatExpenseDate('2026-10-15', 'en');
       expect(enDate.toLowerCase()).toContain('oct');
       expect(enDate).toContain('15');
+    });
+  });
+
+  describe('parseIsoDate', () => {
+    it('returns null for null, undefined, empty, or whitespace strings', () => {
+      expect(parseIsoDate(null)).toBeNull();
+      expect(parseIsoDate(undefined)).toBeNull();
+      expect(parseIsoDate('')).toBeNull();
+      expect(parseIsoDate('   ')).toBeNull();
+    });
+
+    it('returns null for partial date strings (e.g. YYYY or YYYY-MM)', () => {
+      expect(parseIsoDate('2026')).toBeNull();
+      expect(parseIsoDate('2026-10')).toBeNull();
+    });
+
+    it('returns null for invalid or non-date strings', () => {
+      expect(parseIsoDate('not-a-date')).toBeNull();
+      expect(parseIsoDate('2026-02-31')).toBeNull();
+      expect(parseIsoDate('2026-13-01')).toBeNull();
+      expect(parseIsoDate('2026-00-10')).toBeNull();
+    });
+
+    it('returns valid Date for valid YYYY-MM-DD date strings', () => {
+      const parsed = parseIsoDate('2026-10-15');
+      expect(parsed).not.toBeNull();
+      expect(parsed?.getFullYear()).toBe(2026);
+      expect(parsed?.getMonth()).toBe(9); // 0-indexed October
+      expect(parsed?.getDate()).toBe(15);
+    });
+
+    it('returns valid Date for valid ISO 8601 timestamps and numbers', () => {
+      const parsedTs = parseIsoDate('2026-10-15T12:00:00.000Z');
+      expect(parsedTs).not.toBeNull();
+      expect(parsedTs?.toISOString()).toBe('2026-10-15T12:00:00.000Z');
+
+      const numTs = new Date(2026, 9, 15).getTime();
+      const parsedNum = parseIsoDate(numTs);
+      expect(parsedNum).not.toBeNull();
+      expect(parsedNum?.getTime()).toBe(numTs);
+    });
+
+    it('returns null for invalid Date instances or NaN numbers', () => {
+      expect(parseIsoDate(new Date('invalid'))).toBeNull();
+      expect(parseIsoDate(NaN)).toBeNull();
+      expect(parseIsoDate(Infinity)).toBeNull();
     });
   });
 

@@ -1,6 +1,10 @@
 import {
   DashboardHeader,
   MonthlyStatementCard,
+  StatementSpendHero,
+  StatementActionDock,
+  StatementMetricsStrip,
+  StatementCategoryBreakdown,
   MemberLedgerCard,
   RecentExpensesSection,
 } from '@/components/dashboard';
@@ -141,6 +145,67 @@ describe('Dashboard Modular Components', () => {
         />
       );
       expect(element).toBeTruthy();
+    });
+  });
+
+  describe('Sub-components of MonthlyStatementCard', () => {
+    it('StatementSpendHero renders spend details and pacing badge', () => {
+      expect(StatementSpendHero).toBeDefined();
+      const el = (
+        <StatementSpendHero
+          currency="€"
+          transactionCount={5}
+          decimalPart="90"
+          formattedWhole="350"
+          hasPreviousMonthComparison={true}
+          isPacingHigher={true}
+          isPacingLower={false}
+          pacingPct={12}
+        />
+      );
+      expect(el).toBeTruthy();
+    });
+
+    it('StatementActionDock renders quick actions', () => {
+      expect(StatementActionDock).toBeDefined();
+      const el = <StatementActionDock onQuickAdd={jest.fn()} onImport={jest.fn()} />;
+      expect(el).toBeTruthy();
+    });
+
+    it('StatementMetricsStrip renders burn rate and top category', () => {
+      expect(StatementMetricsStrip).toBeDefined();
+      const el = (
+        <StatementMetricsStrip
+          currency="€"
+          dailyAverageBurn={15.5}
+          topCategory={{
+            category: {
+              id: 'c1',
+              family_id: 'fam-1',
+              name: 'Alimentari',
+              icon: 'ShoppingBag',
+              color: '#10B981',
+            },
+            total: 200,
+            transactionCount: 4,
+            percentage: 60,
+          }}
+        />
+      );
+      expect(el).toBeTruthy();
+    });
+
+    it('StatementCategoryBreakdown renders multi-segment bar and category rows', () => {
+      expect(StatementCategoryBreakdown).toBeDefined();
+      const el = (
+        <StatementCategoryBreakdown
+          currency="€"
+          categoryBreakdown={[]}
+          topCategories={[]}
+          onFilterByCategory={jest.fn()}
+        />
+      );
+      expect(el).toBeTruthy();
     });
   });
 
