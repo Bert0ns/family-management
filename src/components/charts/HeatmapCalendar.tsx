@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Filter, X } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n } from '@/i18n';
 import { useAppStore } from '@/services/store';
 import { DailySpendPoint } from '@/services/analytics';
@@ -274,12 +274,15 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
               {selectedFormattedDate}
             </Text>
             <Text
-              style={{
-                color: theme.colors.textPrimary,
-                fontSize: typography.fontSizes.md,
-                fontWeight: typography.fontWeights.heavy,
-                marginTop: 2,
-              }}
+              style={[
+                {
+                  color: theme.colors.textPrimary,
+                  fontSize: typography.fontSizes.md,
+                  fontWeight: typography.fontWeights.heavy,
+                  marginTop: 2,
+                },
+                TABULAR_NUMS,
+              ]}
               numberOfLines={1}
             >
               {selectedAmount > 0

@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import {
   DarkTheme,
   LightTheme,
@@ -8,6 +9,7 @@ import {
   Palette,
   TouchTargets,
   Typography,
+  TABULAR_NUMS,
 } from '@/theme/tokens';
 import { getContrastRatio } from '@/utils/color';
 
@@ -188,6 +190,17 @@ describe('Design Tokens & WCAG AA / AAA Contrast', () => {
       expect(SeniorTypography.fontSizes.xxl).toBeGreaterThan(Typography.fontSizes.xxl);
       expect(SeniorTypography.fontSizes.xxxl).toBeGreaterThan(Typography.fontSizes.xxxl);
       expect(SeniorTypography.fontSizes.display).toBeGreaterThan(Typography.fontSizes.display);
+    });
+
+    it('exposes centralized TABULAR_NUMS', () => {
+      expect(TABULAR_NUMS).toBeDefined();
+      if (Platform.OS === 'web') {
+        expect((TABULAR_NUMS as any).fontVariantNumeric).toBe('tabular-nums');
+      } else {
+        expect(TABULAR_NUMS.fontVariant).toEqual(['tabular-nums']);
+      }
+      expect(Typography.tabularNums).toBe(TABULAR_NUMS);
+      expect(SeniorTypography.tabularNums).toBe(TABULAR_NUMS);
     });
   });
 });

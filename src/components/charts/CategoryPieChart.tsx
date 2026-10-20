@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
-import { useTheme } from '@/theme';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n, getLocalizedCategoryName } from '@/i18n';
 import { CategorySummary } from '@/services/analytics';
 import { Card } from '@/components/common/Card';
@@ -283,12 +283,14 @@ export const CategoryPieChart: React.FC<CategoryPieChartProps> = ({
 
                 <View style={{ alignItems: 'flex-end', flexShrink: 0, gap: 3 }}>
                   <Text
-                    style={{
-                      color: theme.colors.textPrimary,
-                      fontSize: typography.fontSizes.md,
-                      fontWeight: typography.fontWeights.heavy,
-                      fontVariant: ['tabular-nums'],
-                    }}
+                    style={[
+                      {
+                        color: theme.colors.textPrimary,
+                        fontSize: typography.fontSizes.md,
+                        fontWeight: typography.fontWeights.heavy,
+                      },
+                      TABULAR_NUMS,
+                    ]}
                     numberOfLines={1}
                   >
                     {currency}
@@ -304,12 +306,14 @@ export const CategoryPieChart: React.FC<CategoryPieChartProps> = ({
                     }}
                   >
                     <Text
-                      style={{
-                        color: item.category.color,
-                        fontSize: typography.fontSizes.sm,
-                        fontWeight: typography.fontWeights.bold,
-                        fontVariant: ['tabular-nums'],
-                      }}
+                      style={[
+                        {
+                          color: item.category.color,
+                          fontSize: typography.fontSizes.sm,
+                          fontWeight: typography.fontWeights.bold,
+                        },
+                        TABULAR_NUMS,
+                      ]}
                       numberOfLines={1}
                     >
                       {item.percentage.toFixed(1)}%

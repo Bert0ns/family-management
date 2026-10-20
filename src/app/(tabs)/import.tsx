@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, Platform, type TextStyle } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { UploadCloud, CheckCircle2, History, FileSpreadsheet, FileJson } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n } from '@/i18n';
 import { useAppStore } from '@/services/store';
 import { JsonDropzone } from '@/components/import/JsonDropzone';
@@ -18,11 +18,6 @@ import { csvExporter } from '@/services/csvExporter';
 import { exportAndShareFile } from '@/services/fileExporter';
 import { importLogger } from '@/services/logger';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const TABULAR_NUMS: TextStyle =
-  Platform.OS === 'web'
-    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
-    : { fontVariant: ['tabular-nums'] };
 
 export default function ImportScreen() {
   const { theme, spacing, radius, typography } = useTheme();

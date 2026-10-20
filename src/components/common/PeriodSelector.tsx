@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react-native';
 import { useTheme } from '@/theme';
 import { useI18n } from '@/i18n';
+import { formatPeriodLabel, getAdjacentPeriod } from '@/utils/date';
 
 interface PeriodSelectorProps {
   selectedPeriod: string; // YYYY-MM
@@ -16,36 +17,14 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
   const { theme, spacing, radius, typography, touchTargets } = useTheme();
   const { t, locale } = useI18n();
 
-  const [yearStr, monthStr] = selectedPeriod.split('-');
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(monthStr, 10);
-
-  const dateLocale = locale === 'it' ? 'it-IT' : 'en-US';
-  const formattedPeriod = new Date(year, month - 1, 1).toLocaleDateString(dateLocale, {
-    month: 'long',
-    year: 'numeric',
-  });
+  const formattedPeriod = formatPeriodLabel(selectedPeriod, locale);
 
   const handlePrev = () => {
-    let prevYear = year;
-    let prevMonth = month - 1;
-    if (prevMonth < 1) {
-      prevMonth = 12;
-      prevYear -= 1;
-    }
-    const newPeriod = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-    onPeriodChange(newPeriod);
+    onPeriodChange(getAdjacentPeriod(selectedPeriod, -1));
   };
 
   const handleNext = () => {
-    let nextYear = year;
-    let nextMonth = month + 1;
-    if (nextMonth > 12) {
-      nextMonth = 1;
-      nextYear += 1;
-    }
-    const newPeriod = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
-    onPeriodChange(newPeriod);
+    onPeriodChange(getAdjacentPeriod(selectedPeriod, 1));
   };
 
   const chevronButtonDimension = Math.max(48, touchTargets.sm);

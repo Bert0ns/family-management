@@ -1,3 +1,5 @@
+import { Platform, TextStyle } from 'react-native';
+
 export const Palette = {
   emerald: {
     50: '#ECFDF5',
@@ -286,7 +288,13 @@ export const SeniorTouchTargets: typeof TouchTargets = {
   xl: 78,
 };
 
+export const TABULAR_NUMS: TextStyle =
+  Platform.OS === 'web'
+    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
+    : { fontVariant: ['tabular-nums'] };
+
 export const Typography = {
+  tabularNums: TABULAR_NUMS,
   fontSizes: {
     xs: 13,
     sm: 14,
@@ -316,6 +324,7 @@ export const Typography = {
 };
 
 export const SeniorTypography: typeof Typography = {
+  tabularNums: TABULAR_NUMS,
   fontSizes: {
     xs: 15,
     sm: 16,

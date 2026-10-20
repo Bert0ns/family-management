@@ -1,16 +1,10 @@
 import React, { useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Platform,
-  type ViewStyle,
-  type TextStyle,
-} from 'react-native';
-import { useTheme } from '@/theme';
+import { View, Text, TouchableOpacity, Platform, type ViewStyle } from 'react-native';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n, getLocalizedCategoryName } from '@/i18n';
 import { Expense, Category, FamilyMember } from '@/types';
 import { IconHelper } from '@/components/common/IconHelper';
+import { formatExpenseDate } from '@/utils/date';
 
 interface ExpenseItemProps {
   expense: Expense;
@@ -18,26 +12,6 @@ interface ExpenseItemProps {
   member?: FamilyMember;
   currency?: string;
   onPress?: ((expense: Expense) => void) | (() => void);
-}
-
-const TABULAR_NUMS: TextStyle =
-  Platform.OS === 'web'
-    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
-    : { fontVariant: ['tabular-nums'] };
-
-// Hoist date formatters to prevent allocating Intl instances per render
-const DATE_FORMATTERS: Record<string, Intl.DateTimeFormat> = {
-  it: new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' }),
-  en: new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' }),
-};
-
-function formatExpenseDate(dateStr: string, locale: string): string {
-  const formatter = locale === 'it' ? DATE_FORMATTERS.it : DATE_FORMATTERS.en;
-  try {
-    return formatter.format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
 }
 
 export const ExpenseItem: React.FC<ExpenseItemProps> = React.memo(

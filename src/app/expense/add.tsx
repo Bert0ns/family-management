@@ -9,7 +9,6 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
-  type TextStyle,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -22,7 +21,8 @@ import {
   ChevronUp,
   FileJson,
 } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useTheme, TABULAR_NUMS } from '@/theme';
+import { getTodayLocalIso, getYesterdayLocalIso } from '@/utils/date';
 import { TouchTargets } from '@/theme/tokens';
 import { useI18n, getLocalizedCategoryName } from '@/i18n';
 import { useAppStore } from '@/services/store';
@@ -31,29 +31,6 @@ import { Avatar } from '@/components/common/Avatar';
 import { Input } from '@/components/common/Input';
 import { parseLocalizedNumber } from '@/utils/numberParser';
 import type { FamilyMember } from '@/types';
-
-const TABULAR_NUMS: TextStyle =
-  Platform.OS === 'web'
-    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
-    : { fontVariant: ['tabular-nums'] };
-
-// Native-safe local ISO date string helper
-const getTodayLocalIso = (): string => {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const getYesterdayLocalIso = (): string => {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
 const QUICK_AMOUNTS = [5, 10, 20, 50];
 

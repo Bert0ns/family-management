@@ -49,6 +49,13 @@ describe('fileExporter (exportAndShareFile)', () => {
   describe('Web Platform', () => {
     beforeEach(() => {
       Platform.OS = 'web';
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.runOnlyPendingTimers();
+      jest.clearAllTimers();
+      jest.useRealTimers();
     });
 
     it('exports CSV file with UTF-8 BOM, triggers link click, and revokes URL', async () => {
@@ -195,7 +202,7 @@ describe('fileExporter (exportAndShareFile)', () => {
 
       await exportAndShareFile('content', 'file.csv', 'text/csv');
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      jest.advanceTimersByTime(150);
 
       expect(removeMock).toHaveBeenCalledWith(mockLink);
       expect(revokeMock).toHaveBeenCalledWith('blob://test-url');

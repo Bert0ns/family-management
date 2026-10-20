@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, ViewStyle } from 'react-native';
-import { useTheme } from '@/theme';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { Card } from './Card';
 
 type KPIVariant = 'default' | 'success' | 'warning' | 'danger' | 'brand';
@@ -78,13 +78,16 @@ export const KPIStat: React.FC<KPIStatProps> = ({
       </View>
 
       <Text
-        style={{
-          color: theme.colors.textPrimary,
-          fontSize: typography.fontSizes.xl,
-          fontWeight: typography.fontWeights.heavy,
-          marginTop: spacing.xs,
-          letterSpacing: -0.5,
-        }}
+        style={[
+          {
+            color: theme.colors.textPrimary,
+            fontSize: typography.fontSizes.xl,
+            fontWeight: typography.fontWeights.heavy,
+            marginTop: spacing.xs,
+            letterSpacing: -0.5,
+          },
+          TABULAR_NUMS,
+        ]}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.7}
@@ -120,7 +123,7 @@ export const KPIStat: React.FC<KPIStatProps> = ({
           <View
             style={{
               height: '100%',
-              width: `${Math.min(Math.max(progress, 0), 100)}%`,
+              width: `${Math.min(100, Math.max(0, progress))}%`,
               backgroundColor: accent,
               borderRadius: radius.xs,
             }}
