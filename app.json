@@ -28,6 +28,16 @@
     "plugins": ["expo-router", "expo-sharing"],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "c677174a-2092-4a1e-8f70-90a09a338726"
+      }
     }
   }
 }

@@ -23,7 +23,7 @@ import { isValidUUID } from '@/utils/uuid';
 import {
   TabScrollProvider,
   useTabScroll,
-  createAnimatedTabBarMetrics,
+  computeFloatingTabBarMetrics,
 } from '@/context/TabScrollContext';
 
 function TabsLayoutContent() {
@@ -32,12 +32,12 @@ function TabsLayoutContent() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const family = useAppStore((s) => s.family);
-  const { labelsVisibility, tabBarHeight, resetTabScroll } = useTabScroll();
+  const { labelsVisibility, resetTabScroll } = useTabScroll();
 
-  // Floating dock dimensions — smoothly scales both vertically and horizontally
-  const { tabSlotWidth, tabBarWidth, tabBarHorizontalOffset } = useMemo(
-    () => createAnimatedTabBarMetrics(labelsVisibility, windowWidth),
-    [labelsVisibility, windowWidth],
+  // Floating dock dimensions — static layout metrics avoiding native driver conflicts
+  const { barWidth, barHorizontalOffset, tabSlotWidth } = useMemo(
+    () => computeFloatingTabBarMetrics(windowWidth),
+    [windowWidth],
   );
   const floatingBottom = Math.max(insets.bottom, 12) + (Platform.OS === 'ios' ? 4 : 8);
 
@@ -89,13 +89,13 @@ function TabsLayoutContent() {
     const labelLetterSpacing = tabSlotWidth < 78 ? -0.25 : -0.1;
 
     return (
-      <Animated.View
+      <View
         accessibilityLabel={label}
         style={{
           alignItems: 'center',
           justifyContent: 'center',
           width: '100%',
-          height: tabBarHeight,
+          height: 56,
           paddingHorizontal: 1,
         }}
       >
@@ -154,7 +154,7 @@ function TabsLayoutContent() {
         >
           {label}
         </Animated.Text>
-      </Animated.View>
+      </View>
     );
   };
 
@@ -189,13 +189,13 @@ function TabsLayoutContent() {
         tabBarStyle: {
           position: 'absolute',
           bottom: floatingBottom,
-          left: tabBarHorizontalOffset,
-          right: tabBarHorizontalOffset,
-          start: tabBarHorizontalOffset,
-          end: tabBarHorizontalOffset,
-          width: tabBarWidth,
+          left: barHorizontalOffset,
+          right: barHorizontalOffset,
+          start: barHorizontalOffset,
+          end: barHorizontalOffset,
+          width: barWidth,
           alignSelf: 'center',
-          height: tabBarHeight,
+          height: 64,
           backgroundColor: 'transparent',
           borderRadius: Radius.dock,
           borderWidth: 1,
@@ -239,7 +239,7 @@ function TabsLayoutContent() {
         ),
         tabBarIconStyle: {
           width: '100%',
-          height: '100%',
+          height: 56,
           justifyContent: 'center',
           alignItems: 'center',
           margin: 0,
@@ -250,7 +250,7 @@ function TabsLayoutContent() {
           minWidth: 0,
           justifyContent: 'center',
           alignItems: 'center',
-          height: '100%',
+          height: 64,
           padding: 0,
           margin: 0,
         },
