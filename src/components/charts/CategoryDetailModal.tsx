@@ -158,8 +158,6 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
                   height: 36,
                   borderRadius: radius.md,
                   backgroundColor: `${category.color}20`,
-                  alignItems: 'center',
-                  justifyContent: 'center',
                 }}
               >
                 <Tag size={18} color={category.color} />
@@ -331,16 +329,38 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({
                     }}
                   >
                     <View style={{ flex: 1, marginRight: spacing.sm }}>
-                      <Text
-                        style={{
-                          color: theme.colors.textPrimary,
-                          fontSize: typography.fontSizes.sm,
-                          fontWeight: typography.fontWeights.semibold,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {expense.merchant_name}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text
+                          style={{
+                            color: theme.colors.textPrimary,
+                            fontSize: typography.fontSizes.sm,
+                            fontWeight: typography.fontWeights.semibold,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {expense.merchant_name}
+                        </Text>
+                        {expense.is_recurring && (
+                          <View
+                            style={{
+                              backgroundColor: `${theme.colors.brand}18`,
+                              paddingHorizontal: 4,
+                              paddingVertical: 1,
+                              borderRadius: radius.xs,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: theme.colors.brand,
+                                fontSize: 9,
+                                fontWeight: typography.fontWeights.bold,
+                              }}
+                            >
+                              {t.analytics.recurringTag}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                       <View
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}
                       >

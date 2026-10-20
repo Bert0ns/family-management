@@ -1,4 +1,11 @@
-import { Expense, Category, FamilyMember, RawExpenseReport, Family } from '@/types';
+import {
+  Expense,
+  Category,
+  FamilyMember,
+  RawExpenseReport,
+  Family,
+  RecurringFrequency,
+} from '@/types';
 
 export interface CategorySummary {
   category: Category;
@@ -37,6 +44,9 @@ export interface MonthlyTrendPoint {
   transactionCount: number;
   momGrowthPercentage: number | null; // null for first baseline month
   rollingAverage: number;
+  fixedSpend?: number;
+  variableSpend?: number;
+  fixedPercentage?: number;
 }
 
 export interface ComparativeVelocityData {
@@ -85,6 +95,36 @@ export interface PaymentMethodSummary {
   color: string;
 }
 
+export interface RecurringExpenseItem {
+  expense: Expense;
+  frequency: RecurringFrequency;
+  monthlyAmount: number;
+  annualAmount: number;
+  category?: Category;
+  payer?: FamilyMember;
+}
+
+export interface RecurringCategoryShare {
+  category: Category;
+  total: number;
+  percentage: number;
+  count: number;
+}
+
+export interface FixedVsVariableBreakdown {
+  period: string;
+  totalSpend: number;
+  fixedSpend: number;
+  variableSpend: number;
+  fixedPercentage: number;
+  variablePercentage: number;
+  recurringCount: number;
+  variableCount: number;
+  annualizedFixedSpend: number;
+  recurringItems: RecurringExpenseItem[];
+  categoryBreakdown: RecurringCategoryShare[];
+}
+
 /**
  * Interface Segregation Principle (ISP) & Dependency Inversion Principle (DIP):
  * High-level modules depend on abstractions, and client code only depends on methods it uses.
@@ -119,6 +159,13 @@ export interface IAnalyticsCalculator {
   calculateDayOfWeekDistribution(expenses: Expense[], period?: string): DayOfWeekDistribution;
 
   calculatePaymentMethodDistribution(expenses: Expense[], period?: string): PaymentMethodSummary[];
+
+  calculateFixedVsVariableBreakdown(
+    expenses: Expense[],
+    categories: Category[],
+    members: FamilyMember[],
+    period: string,
+  ): FixedVsVariableBreakdown;
 }
 
 export interface IReportValidator {
