@@ -1,13 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  FlatList,
-  TouchableOpacity,
-  Platform,
-  type TextStyle,
-} from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Search,
@@ -20,13 +12,13 @@ import {
   FileJson,
   Calendar,
 } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n, getLocalizedCategoryName } from '@/i18n';
 import { useAppStore } from '@/services/store';
 import { ExpenseItem } from '@/components/ledger/ExpenseItem';
 import { ExpenseDetailModal } from '@/components/ledger/ExpenseDetailModal';
 import { EditExpenseModal } from '@/components/ledger/EditExpenseModal';
-import { FormModal } from '@/components/common/FormModal';
+import { LedgerFilterModal } from '@/components/ledger/LedgerFilterModal';
 import { Input } from '@/components/common/Input';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
@@ -36,11 +28,6 @@ import { Expense, PeriodPreset, AmountBracket } from '@/types';
 import { sumBy } from '@/utils/numberParser';
 import { useTabScroll } from '@/context/TabScrollContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const TABULAR_NUMS: TextStyle =
-  Platform.OS === 'web'
-    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
-    : { fontVariant: ['tabular-nums'] };
 
 // Hoisted helper date preset checker
 const matchesPeriod = (dateStr: string, preset: PeriodPreset): boolean => {
@@ -797,340 +784,16 @@ export default function LedgerScreen() {
         />
 
         {/* Detailed Senior-Accessible Filter Modal */}
-        <FormModal
+        <LedgerFilterModal
           visible={isFilterModalVisible}
-          title={t.ledger.filtersTitle}
-          icon={<Filter size={24} color={theme.colors.brand} strokeWidth={2.5} />}
           onClose={() => setIsFilterModalVisible(false)}
-          onSubmit={() => setIsFilterModalVisible(false)}
-          submitTitle={t.ledger.applyFilters}
-          cancelTitle={t.common.close}
-        >
-          <View style={{ gap: spacing.xl, paddingVertical: spacing.xs }}>
-            {/* Period Section */}
-            <View>
-              <Text
-                style={{
-                  fontSize: typography.fontSizes.md,
-                  fontWeight: typography.fontWeights.bold,
-                  color: theme.colors.textPrimary,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.expenseDetail.date}
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-                {periodOptions.map((opt) => {
-                  const isSelected = activePeriodPreset === opt.key;
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      activeOpacity={0.75}
-                      onPress={() => setFilters({ periodPreset: opt.key })}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected }}
-                      style={{
-                        minHeight: 48,
-                        paddingHorizontal: spacing.md,
-                        borderRadius: radius.md,
-                        backgroundColor: isSelected
-                          ? theme.colors.brand
-                          : theme.isDark
-                            ? theme.colors.surfaceContainerHigh
-                            : theme.colors.surfaceSubtle,
-                        borderWidth: 1.5,
-                        borderColor: isSelected ? theme.colors.brand : theme.colors.borderTactile,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: isSelected ? '#FFFFFF' : theme.colors.textPrimary,
-                          fontSize: typography.fontSizes.sm,
-                          fontWeight: typography.fontWeights.bold,
-                        }}
-                      >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Amount Bracket Section */}
-            <View>
-              <Text
-                style={{
-                  fontSize: typography.fontSizes.md,
-                  fontWeight: typography.fontWeights.bold,
-                  color: theme.colors.textPrimary,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.addExpense.amountLabel}
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-                {amountOptions.map((opt) => {
-                  const isSelected = activeAmountBracket === opt.key;
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      activeOpacity={0.75}
-                      onPress={() => setFilters({ amountBracket: opt.key })}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected }}
-                      style={{
-                        minHeight: 48,
-                        paddingHorizontal: spacing.md,
-                        borderRadius: radius.md,
-                        backgroundColor: isSelected
-                          ? theme.colors.brand
-                          : theme.isDark
-                            ? theme.colors.surfaceContainerHigh
-                            : theme.colors.surfaceSubtle,
-                        borderWidth: 1.5,
-                        borderColor: isSelected ? theme.colors.brand : theme.colors.borderTactile,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: isSelected ? '#FFFFFF' : theme.colors.textPrimary,
-                          fontSize: typography.fontSizes.sm,
-                          fontWeight: typography.fontWeights.bold,
-                        }}
-                      >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Filter by Member */}
-            <View>
-              <Text
-                style={{
-                  fontSize: typography.fontSizes.md,
-                  fontWeight: typography.fontWeights.bold,
-                  color: theme.colors.textPrimary,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.ledger.filterByMember}
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-                <TouchableOpacity
-                  activeOpacity={0.75}
-                  onPress={() => setFilters({ selectedMemberId: undefined })}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: !filters.selectedMemberId }}
-                  style={{
-                    minHeight: 50,
-                    paddingHorizontal: spacing.md,
-                    borderRadius: radius.md,
-                    backgroundColor: !filters.selectedMemberId
-                      ? theme.colors.brand
-                      : theme.isDark
-                        ? theme.colors.surfaceContainerHigh
-                        : theme.colors.surfaceSubtle,
-                    borderWidth: 1.5,
-                    borderColor: !filters.selectedMemberId
-                      ? theme.colors.brand
-                      : theme.colors.borderTactile,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: !filters.selectedMemberId ? '#FFFFFF' : theme.colors.textPrimary,
-                      fontSize: typography.fontSizes.sm,
-                      fontWeight: typography.fontWeights.bold,
-                    }}
-                  >
-                    {t.ledger.allMembers}
-                  </Text>
-                </TouchableOpacity>
-
-                {members.map((m) => {
-                  const isSelected = filters.selectedMemberId === m.id;
-                  return (
-                    <TouchableOpacity
-                      key={m.id}
-                      activeOpacity={0.75}
-                      onPress={() => setFilters({ selectedMemberId: m.id })}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected }}
-                      style={{
-                        minHeight: 50,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: spacing.sm,
-                        paddingHorizontal: spacing.md,
-                        borderRadius: radius.md,
-                        backgroundColor: isSelected
-                          ? `${m.color_code}25`
-                          : theme.isDark
-                            ? theme.colors.surfaceContainerHigh
-                            : theme.colors.surfaceSubtle,
-                        borderWidth: 1.5,
-                        borderColor: isSelected ? m.color_code : theme.colors.borderTactile,
-                      }}
-                    >
-                      <Avatar
-                        name={m.display_name}
-                        avatarUrl={m.avatar_url}
-                        colorCode={m.color_code}
-                        size="sm"
-                      />
-                      <Text
-                        style={{
-                          color: isSelected ? m.color_code : theme.colors.textPrimary,
-                          fontSize: typography.fontSizes.sm,
-                          fontWeight: isSelected
-                            ? typography.fontWeights.heavy
-                            : typography.fontWeights.semibold,
-                        }}
-                      >
-                        {m.display_name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Filter by Category */}
-            <View>
-              <Text
-                style={{
-                  fontSize: typography.fontSizes.md,
-                  fontWeight: typography.fontWeights.bold,
-                  color: theme.colors.textPrimary,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.ledger.filterByCategory}
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-                <TouchableOpacity
-                  activeOpacity={0.75}
-                  onPress={() => setFilters({ selectedCategoryId: undefined })}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: !filters.selectedCategoryId }}
-                  style={{
-                    minHeight: 50,
-                    paddingHorizontal: spacing.md,
-                    borderRadius: radius.md,
-                    backgroundColor: !filters.selectedCategoryId
-                      ? theme.colors.brand
-                      : theme.isDark
-                        ? theme.colors.surfaceContainerHigh
-                        : theme.colors.surfaceSubtle,
-                    borderWidth: 1.5,
-                    borderColor: !filters.selectedCategoryId
-                      ? theme.colors.brand
-                      : theme.colors.borderTactile,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: !filters.selectedCategoryId ? '#FFFFFF' : theme.colors.textPrimary,
-                      fontSize: typography.fontSizes.sm,
-                      fontWeight: typography.fontWeights.bold,
-                    }}
-                  >
-                    {t.ledger.allCategories}
-                  </Text>
-                </TouchableOpacity>
-
-                {categories.map((c) => {
-                  const isSelected = filters.selectedCategoryId === c.id;
-                  const catDisplayName = getLocalizedCategoryName(c, t);
-                  return (
-                    <TouchableOpacity
-                      key={c.id}
-                      activeOpacity={0.75}
-                      onPress={() => setFilters({ selectedCategoryId: c.id })}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected }}
-                      style={{
-                        minHeight: 50,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: spacing.sm,
-                        paddingHorizontal: spacing.md,
-                        borderRadius: radius.md,
-                        backgroundColor: isSelected
-                          ? `${c.color}25`
-                          : theme.isDark
-                            ? theme.colors.surfaceContainerHigh
-                            : theme.colors.surfaceSubtle,
-                        borderWidth: 1.5,
-                        borderColor: isSelected ? c.color : theme.colors.borderTactile,
-                      }}
-                    >
-                      <IconHelper name={c.icon} size={18} color={c.color} />
-                      <Text
-                        style={{
-                          color: isSelected ? c.color : theme.colors.textPrimary,
-                          fontSize: typography.fontSizes.sm,
-                          fontWeight: isSelected
-                            ? typography.fontWeights.heavy
-                            : typography.fontWeights.semibold,
-                        }}
-                      >
-                        {catDisplayName}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Reset All Button */}
-            {hasActiveFilters && (
-              <TouchableOpacity
-                activeOpacity={0.75}
-                onPress={() => {
-                  handleResetFilters();
-                  setIsFilterModalVisible(false);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t.ledger.clearFilters}
-                style={{
-                  minHeight: 50,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: spacing.sm,
-                  backgroundColor: theme.colors.dangerBg,
-                  borderRadius: radius.md,
-                  borderWidth: 1.5,
-                  borderColor: theme.colors.danger,
-                }}
-              >
-                <RotateCcw size={18} color={theme.colors.danger} strokeWidth={2.5} />
-                <Text
-                  style={{
-                    color: theme.colors.danger,
-                    fontSize: typography.fontSizes.md,
-                    fontWeight: typography.fontWeights.bold,
-                  }}
-                >
-                  {t.ledger.clearFilters}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </FormModal>
+          periodOptions={periodOptions}
+          amountOptions={amountOptions}
+          activePeriodPreset={activePeriodPreset}
+          activeAmountBracket={activeAmountBracket}
+          hasActiveFilters={hasActiveFilters}
+          onResetFilters={handleResetFilters}
+        />
       </View>
     </View>
   );

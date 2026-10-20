@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform, type TextStyle } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { PieChart, Users, TrendingUp, Activity, Calendar, Repeat } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n } from '@/i18n';
 import { useAppStore } from '@/services/store';
 import {
@@ -29,11 +29,6 @@ import { FixedVsVariableCard } from '@/components/charts/FixedVsVariableCard';
 import { ActiveRecurringList } from '@/components/charts/ActiveRecurringList';
 import { useTabScroll } from '@/context/TabScrollContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const TABULAR_NUMS: TextStyle =
-  Platform.OS === 'web'
-    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
-    : { fontVariant: ['tabular-nums'] };
 
 export default function AnalyticsScreen() {
   const { theme, spacing, radius, typography } = useTheme();

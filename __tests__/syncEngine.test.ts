@@ -29,6 +29,10 @@ describe('syncEngine', () => {
     useAppStore.getState().resetToSampleData();
   });
 
+  afterEach(() => {
+    jest.clearAllTimers();
+  });
+
   describe('Outbox Queue and Storage', () => {
     it('enqueues mutations into the AsyncStorage outbox', async () => {
       (isSupabaseConfigured as jest.Mock).mockReturnValue(false);

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
-import { useTheme } from '@/theme';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n } from '@/i18n';
 import { MemberSummary } from '@/services/analytics';
 import { Avatar } from '@/components/common/Avatar';
@@ -39,13 +39,15 @@ export const MemberBarChart: React.FC<MemberBarChartProps> = ({
     frontColor: item.member.color_code || theme.colors.brand,
     topLabelComponent: () => (
       <Text
-        style={{
-          color: theme.colors.textPrimary,
-          fontSize: typography.fontSizes.sm,
-          fontWeight: typography.fontWeights.bold,
-          fontVariant: ['tabular-nums'],
-          marginBottom: 4,
-        }}
+        style={[
+          {
+            color: theme.colors.textPrimary,
+            fontSize: typography.fontSizes.sm,
+            fontWeight: typography.fontWeights.bold,
+            marginBottom: 4,
+          },
+          TABULAR_NUMS,
+        ]}
         numberOfLines={1}
       >
         {currency}
@@ -204,24 +206,28 @@ export const MemberBarChart: React.FC<MemberBarChartProps> = ({
 
                 <View style={{ alignItems: 'flex-end', flexShrink: 0, gap: 2 }}>
                   <Text
-                    style={{
-                      color: theme.colors.textPrimary,
-                      fontSize: typography.fontSizes.md,
-                      fontWeight: typography.fontWeights.heavy,
-                      fontVariant: ['tabular-nums'],
-                    }}
+                    style={[
+                      {
+                        color: theme.colors.textPrimary,
+                        fontSize: typography.fontSizes.md,
+                        fontWeight: typography.fontWeights.heavy,
+                      },
+                      TABULAR_NUMS,
+                    ]}
                     numberOfLines={1}
                   >
                     {currency}
                     {item.total.toFixed(2)}
                   </Text>
                   <Text
-                    style={{
-                      color: theme.colors.textSecondary,
-                      fontSize: typography.fontSizes.sm,
-                      fontWeight: typography.fontWeights.semibold,
-                      fontVariant: ['tabular-nums'],
-                    }}
+                    style={[
+                      {
+                        color: theme.colors.textSecondary,
+                        fontSize: typography.fontSizes.sm,
+                        fontWeight: typography.fontWeights.semibold,
+                      },
+                      TABULAR_NUMS,
+                    ]}
                     numberOfLines={1}
                   >
                     {item.percentage.toFixed(1)}%

@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
-import { View, Text, TouchableOpacity, Platform, type TextStyle } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { ShieldCheck, User, Eye, ChevronRight, ReceiptText } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useTheme, TABULAR_NUMS } from '@/theme';
 import { useI18n } from '@/i18n';
 import { FamilyMember } from '@/types';
 import { Avatar } from '@/components/common/Avatar';
@@ -16,11 +16,6 @@ interface MemberCardProps {
   isCurrentUser?: boolean;
   onSelect?: ((member: FamilyMember) => void) | (() => void);
 }
-
-const TABULAR_NUMS: TextStyle =
-  Platform.OS === 'web'
-    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
-    : { fontVariant: ['tabular-nums'] };
 
 export const MemberCard: React.FC<MemberCardProps> = React.memo(
   ({ member, totalSpent, transactionCount, currency = '€', isCurrentUser = false, onSelect }) => {

@@ -16,7 +16,8 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Calendar, User, CreditCard, Trash2, X, Pencil, Tag } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useTheme, TABULAR_NUMS } from '@/theme';
+import { formatIsoDate } from '@/utils/date';
 import { useI18n, getLocalizedCategoryName, getLocalizedPaymentMethod } from '@/i18n';
 import { useAppStore } from '@/services/store';
 import { Expense, Category, FamilyMember } from '@/types';
@@ -79,7 +80,6 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
     : t.categories.other;
   const memberName = resolvedMember?.display_name || t.tabs.family;
 
-  const dateLocale = locale === 'it' ? 'it-IT' : 'en-US';
   const localizedPaymentMethod = getLocalizedPaymentMethod(expense.payment_method, t);
 
   const handleDelete = () => {
@@ -266,14 +266,17 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </View>
 
               <Text
-                style={{
-                  color: theme.colors.textPrimary,
-                  fontSize: typography.fontSizes.xxxl,
-                  fontWeight: typography.fontWeights.heavy,
-                  letterSpacing: -0.5,
-                  maxWidth: '90%',
-                  textAlign: 'center',
-                }}
+                style={[
+                  {
+                    color: theme.colors.textPrimary,
+                    fontSize: typography.fontSizes.xxxl,
+                    fontWeight: typography.fontWeights.heavy,
+                    letterSpacing: -0.5,
+                    maxWidth: '90%',
+                    textAlign: 'center',
+                  },
+                  TABULAR_NUMS,
+                ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
@@ -464,12 +467,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                   }}
                   numberOfLines={1}
                 >
-                  {new Date(expense.transaction_date).toLocaleDateString(dateLocale, {
-                    weekday: 'short',
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
+                  {formatIsoDate(expense.transaction_date, locale)}
                 </Text>
               </View>
 

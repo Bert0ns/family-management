@@ -68,6 +68,8 @@ describe('realtimeSync', () => {
 
   afterEach(() => {
     realtimeSync.stopRealtimeSync();
+    jest.clearAllTimers();
+    jest.useRealTimers();
   });
 
   it('does not start if Supabase is not configured', () => {
@@ -126,6 +128,7 @@ describe('realtimeSync', () => {
       subscribeStatusCallback?.('SUBSCRIBED');
       expect(() => jest.advanceTimersByTime(500)).not.toThrow();
     } finally {
+      jest.clearAllTimers();
       jest.useRealTimers();
     }
   });

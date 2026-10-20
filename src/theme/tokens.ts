@@ -288,7 +288,13 @@ export const SeniorTouchTargets: typeof TouchTargets = {
   xl: 78,
 };
 
+export const TABULAR_NUMS: TextStyle =
+  Platform.OS === 'web'
+    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
+    : { fontVariant: ['tabular-nums'] };
+
 export const Typography = {
+  tabularNums: TABULAR_NUMS,
   fontSizes: {
     xs: 13,
     sm: 14,
@@ -318,6 +324,7 @@ export const Typography = {
 };
 
 export const SeniorTypography: typeof Typography = {
+  tabularNums: TABULAR_NUMS,
   fontSizes: {
     xs: 15,
     sm: 16,
@@ -355,8 +362,3 @@ export const MemberColors = [
   { name: 'Moss', bg: '#476E54', light: '#E9EFEA' },
   { name: 'Teal', bg: '#366873', light: '#E6ECEE' },
 ];
-
-export const TABULAR_NUMS: TextStyle =
-  Platform.OS === 'web'
-    ? ({ fontVariantNumeric: 'tabular-nums' } as unknown as TextStyle)
-    : { fontVariant: ['tabular-nums'] };
